@@ -1,26 +1,39 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* =====================================================================
+   COLOURS — change a colour here and it changes everywhere in the app.
+   Each "--color-NAME" becomes Tailwind classes you can use:
+     bg-NAME (background)   text-NAME (text)   border-NAME (border)
+   e.g. --color-primary → bg-primary, text-primary, border-primary
+   To add a new colour: add a line like  --color-danger: #b91c1c;
+   then use bg-danger / text-danger in your code.
+   ===================================================================== */
+@theme {
+  --color-primary: #9a4100;   /* buttons, prices */
+  --color-canvas: #fff8f5;    /* page background */
+  --color-surface: #ffffff;   /* cards */
+  --color-tint: #fff1ea;      /* soft panels, badges */
+  --color-line: #f0dccf;      /* thin borders */
+  --color-ink: #251911;       /* main text */
+  --color-ink-2: #574238;     /* secondary text */
+  --color-primary-soft: #bd5611; /* active menu item */
 }
 
+/* FONT — "font-sans" (the default font) = Plus Jakarta Sans, loaded in layout.tsx.
+   "inline" is needed because the font variable is set by Next.js. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* the whole page: cream background + dark brown text */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* SIZE OF EVERYTHING — Tailwind sizes are in "rem" (1rem = this font-size).
+   Browser default is 16px. 14px makes text, padding, h-11 buttons etc. ~12% smaller.
+   Only rem-based classes change; fixed ones like w-[68px] or text-[11px] do NOT. */
+html {
+  font-size: 14px;
 }

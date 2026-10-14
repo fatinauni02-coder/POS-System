@@ -1,69 +1,66 @@
-import Image from "next/image";
+import { Suspense } from "react";
 
-export default function Home() {
+import { getBusiness } from "@/lib/business";
+import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+//import { OrderScreen } from "./order-screen";
+import { OrderScreenClient } from "./order-screen-client";
+
+// "/" = the Order screen (the till)
+export default function OrderPage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <Suspense fallback={<p className="p-6">Loading…</p>}>
+      <OrderContent />
+    </Suspense>
   );
+}
+
+async function OrderContent() {
+  const business = await getBusiness();
+  if (!business) return <p className="p-6 text-red-600">Shop not found</p>;
+
+  const { data: categories } = await supabase
+    .from("categories")
+    .select("id, name")
+    .eq("business_id", business.id)
+    .order("sort_order");
+
+  const { data: items, error } = await supabase
+    .from("menu_items")
+    .select("id, name, price, category_id, is_available, menu_item_option_groups(group_id)")
+    .eq("business_id", business.id)
+    .order("name");
+
+  // option groups + their options (e.g. Temperature: Hot / Iced)
+  const { data: groups } = await supabase
+    .from("option_groups")
+    .select("id, name, required, options(id, name, price, sort_order)")
+    .eq("business_id", business.id)
+    .order("sort_order")
+    .order("sort_order", { referencedTable: "options" }); // sort the groups, then sort the options within each group
+
+  if (error) return <p className="p-6 text-red-600">Error: {error.message}</p>;
+  // table labels set up for this shop (suggestions for the table box); public data → anon key
+  const { data: tables } = await supabase.from("dining_tables").select("label").eq("business_id", business.id).order("label");
+
+  // SST only if the shop is registered (6% in Malaysia for F&B)
+  // ---------- how many of each item the stock can still make ----------
+  // recipes + stock are private → read them with the secret key (this file runs on the server)
+  const [{ data: recipes }, { data: stock }] = await Promise.all([
+    supabaseAdmin.from("menu_item_recipes").select("menu_item_id, stock_item_id, qty").eq("business_id", business.id),
+    supabaseAdmin.from("stock_items").select("id, qty").eq("business_id", business.id),
+  ]);
+  // a Map is a quick "look up by id" table: stock id → amount on hand
+  const onHand = new Map((stock ?? []).map((s) => [s.id, Number(s.qty)]));
+
+  // e.g. Latte needs 18 g beans (have 100 → 5) and 200 ml milk (have 8000 → 40) → can make 5
+  function leftFor(itemId: number): number | null {
+    const lines = (recipes ?? []).filter((r) => r.menu_item_id === itemId);
+    if (lines.length === 0) return null; // no recipe = no limit
+    return Math.min(...lines.map((r) => Math.floor((onHand.get(r.stock_item_id) ?? 0) / Number(r.qty))));
+  }
+  const itemsWithLeft = (items ?? []).map((i) => ({ ...i, left: leftFor(i.id) }));
+  const sstRate = business.sst_registered ? Number(business.sst_rate) : 0;
+
+  return <OrderScreenClient categories={categories ?? []} items={itemsWithLeft} groups={groups ?? []} sstRate={sstRate} tables={(tables ??[]).map((t) => t.label)} />;
 }
