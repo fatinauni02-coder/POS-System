@@ -5,6 +5,7 @@ import { addDays, dayInKL, TZ } from "@/lib/dates";
 import { getBusiness } from "@/lib/business";
 import { formatRM, toSen } from "@/lib/money";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { Stat } from "@/components/stat";
 
 // "/history" = today's orders; "/history?date=2026-10-12" = another day
 export default function HistoryPage({ searchParams }: PageProps<"/history">) {
@@ -107,16 +108,6 @@ async function History({ searchParams }: { searchParams: PageProps<"/history">["
           );
         })}
       </div>
-    </div>
-  );
-}
-
-// one summary box: small label on top, big number below
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-line bg-surface p-4">
-      <p className="text-sm text-ink-2">{label}</p>
-      <p className="mt-1 text-2xl font-bold">{value}</p>
     </div>
   );
 }

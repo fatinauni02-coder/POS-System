@@ -1,6 +1,6 @@
 "use client"; // needs the browser: usePathname reads the current address
 
-import { Package, ReceiptText, Settings, ShoppingBasket, UtensilsCrossed } from "lucide-react";
+import { ChartColumn, Package, ReceiptText, Settings, ShoppingBasket, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -8,10 +8,11 @@ import { usePathname } from "next/navigation";
 // icon = any icon from lucide.dev (import it on line 3 first)
 export const NAV = [
   { href: "/", label: "Order", icon: ShoppingBasket },
-  { href: "/history", label: "History", icon: ReceiptText },
   { href: "/menu", label: "Menu", icon: UtensilsCrossed },
   { href: "/stock", label: "Stock", icon: Package },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/history", label: "History", icon: ReceiptText },
+  { href: "/report", label: "Report", icon: ChartColumn },
 ];
 
 export function SideNav() {
@@ -33,7 +34,7 @@ export function SideNav() {
       {/* LINKS: gap-1.5 = space between buttons */}
       <nav className="flex flex-col gap-1.5">
         {NAV.map(({ href, label, icon: Icon }) => {
-          const active  = href === "/" ? path === "/" : path.startsWith(href); // true for the page you are on
+          const active = href === "/" ? path === "/" : path.startsWith(href); // true for the page you are on
           return (
             // ONE BUTTON (icon on top, label under it)
             // w-[56px] = button width (keep it smaller than the sidebar width)
@@ -43,9 +44,8 @@ export function SideNav() {
             <Link
               key={href}
               href={href}
-              className={`flex w-[56px] flex-col items-center gap-1 rounded-2xl py-2.5 text-[11px] font-semibold ${
-                active ? "bg-primary-soft text-white" : "text-ink-2 hover:bg-tint"
-              }`}
+              className={`flex w-[56px] flex-col items-center gap-1 rounded-2xl py-2.5 text-[11px] font-semibold ${active ? "bg-primary-soft text-white" : "text-ink-2 hover:bg-tint"
+                }`}
             >
               {/* icon size: h-5 w-5 (20px). Try h-6 w-6 for bigger */}
               <Icon className="h-5 w-5" />
