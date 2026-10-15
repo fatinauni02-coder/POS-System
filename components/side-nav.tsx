@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 
 // MENU LINKS — add / remove / reorder buttons here.
 // icon = any icon from lucide.dev (import it on line 3 first)
-const NAV = [
+export const NAV = [
   { href: "/", label: "Order", icon: ShoppingBasket },
   { href: "/history", label: "History", icon: ReceiptText },
   { href: "/menu", label: "Menu", icon: UtensilsCrossed },
@@ -24,7 +24,7 @@ export function SideNav() {
     // flex-col items-center gap-2 = logo + links stacked, centred, with gaps
     // border-r   = thin line on the right side
     // py-4       = space at the top and bottom
-    <aside className="flex w-[68px] print:hidden shrink-0 flex-col items-center gap-2 border-r border-line bg-surface py-4">
+    <aside className="hidden md:flex w-[68px] print:hidden shrink-0 flex-col items-center gap-2 border-r border-line bg-surface py-4">
       {/* LOGO: h-11 w-11 = square size, rounded-xl = corner roundness, mb-3 = gap under it */}
       <Link href="/" className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-lg font-bold text-white">
         K
@@ -33,7 +33,7 @@ export function SideNav() {
       {/* LINKS: gap-1.5 = space between buttons */}
       <nav className="flex flex-col gap-1.5">
         {NAV.map(({ href, label, icon: Icon }) => {
-          const active = path === href; // true for the page you are on
+          const active  = href === "/" ? path === "/" : path.startsWith(href); // true for the page you are on
           return (
             // ONE BUTTON (icon on top, label under it)
             // w-[56px] = button width (keep it smaller than the sidebar width)

@@ -37,7 +37,7 @@ function loadCart(): CartLine[] {
     }
 }
 
-export function OrderScreen({ categories, items, groups, sstRate, tables}: Props) {
+export function OrderScreen({ categories, items, groups, sstRate, tables }: Props) {
     // ---------- STATE (values that change → screen redraws) ----------
     const [activeCat, setActiveCat] = useState(categories[0]?.id ?? "all"); // selected chip; starts on the 1st category
     const [cart, setCart] = useState<CartLine[]>(loadCart);
@@ -47,8 +47,9 @@ export function OrderScreen({ categories, items, groups, sstRate, tables}: Props
     const [discount, setDiscount] = useState<{ pct: number; token: string } | null>(null); // discount applied to the cart
     const [askDiscount, setAskDiscount] = useState(false); // show the "enter manager PIN for discount" pop-up?
     const router = useRouter();
-    const [orderType, setOrderType] = useState<"takeaway"  | "dine_in">("takeaway");
+    const [orderType, setOrderType] = useState<"takeaway" | "dine_in">("takeaway");
     const [table, setTable] = useState("");
+    const [showCart, setShowCart] = useState(false);
     const needsTable = orderType === "dine_in" && table.trim() === "";
 
     // every time the cart changes, save it in the browser (so F5 doesn't lose it)
@@ -136,6 +137,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables}: Props
         setDiscount(null); // discount only applies to one order
         setTable("");
         setPaying(false);
+        setShowCart(false);
         setDone({ orderId: result.orderId, orderNo: result.orderNo, change: result.change });
         router.refresh();
         return null;
@@ -166,7 +168,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables}: Props
                 min-w-0 = allowed to shrink (so the cart never gets pushed off screen)
                 flex-col gap-4 = chips row on top, grid below, 4 apart
                 p-5 = space around the edges */}
-            <main className="flex min-w-0 flex-1 flex-col gap-4 p-5">
+            <main className="flex min-w-0 flex-1 flex-col gap-4 p-3 lg:p-5">
                 {/* CATEGORY CHIPS: one row, gap-2 between chips
                     overflow-x-auto = too many chips → the row scrolls sideways (pb-1 = room for the scrollbar) */}
                 <div className="flex gap-2 overflow-x-auto pb-1">
@@ -192,7 +194,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables}: Props
                       → bigger tiles: change 160px to 200px; smaller: 130px
                       → a fixed number of columns instead: grid-cols-4
                     gap-3 = space between tiles; overflow-y-auto = the grid scrolls; pb-6 = space at the bottom */}
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3 overflow-y-auto pb-6">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3 overflow-y-auto pb-6">
                     {shown.map((item) => (
                         // ONE TILE (a button): picture / name / price / "+ options"
                         // flex-col = stacked; p-3 = inner space; text-left = text aligned left
@@ -225,19 +227,33 @@ export function OrderScreen({ categories, items, groups, sstRate, tables}: Props
                         </button>
                     ))}
                 </div>
+                {count > 0 && (
+                    <button
+                        onClick={() => setShowCart(true)}
+                        className="flex h-14 shrink-0 items-center justify-between rounded-2xl bg-primary px-5 font-bold text-white md:hidden"
+                    >
+                        <span>View order ({count})</span>
+                        <span>{formatRM(total)}</span>
+                    </button>
+                )}
             </main>
 
             {/* ===== RIGHT: CART =====
                 w-[340px] = cart width → change it here
                 shrink-0 = keep that width even on small screens
                 flex-col = title / lines / totals stacked; border-l = line on its left */}
-            <aside className="flex w-[340px] shrink-0 flex-col border-l border-line bg-surface">
+            <aside
+                className={`${showCart ? "fixed inset-0 z-30 flex" : "hidden"} flex-col bg-surface md:static md:flex md:w-[290px] lg:w-[340px] md:shrink-0 md:border-l md:border-line`}
+            >
                 {/* TITLE: px-5 pt-5 = space at the sides and top; text-2xl = size */}
+                <button onClick={() => setShowCart(false)} className="px-5 pt-4 text-left font-semibold text-primary md:hidden">
+                    ← Back to menu
+                </button>
                 <h1 className="px-5 pt-5 text-2xl font-bold">
                     Current order <span className="text-base font-semibold text-ink-2">({count} items)</span>
                 </h1>
 
-                
+
                 {/* TAKEAWAY / DINE-IN: two buttons side by side (grid-cols-2) */}
                 <div className="mt-3 grid grid-cols-2 gap-2 px-5">
                     {(["takeaway", "dine_in"] as const).map((t) => (
