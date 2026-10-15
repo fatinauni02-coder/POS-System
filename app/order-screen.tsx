@@ -20,7 +20,7 @@ export type Item = {
 export type Option = { id: string; name: string; price: number | string; sort_order: number }; // e.g. Iced +1.00
 export type Group = { id: string; name: string; required: boolean; options: Option[] }; // e.g. Temperature
 // one line in the cart. key = item id + chosen option ids, so "Latte Hot" and "Latte Iced" are 2 lines
-export type CartLine = { key: string; itemId: number; name: string; options: string[]; optionIds: string[]; unitSen: number; qty: number };
+export type CartLine = { key: string; itemId: number; name: string; options: string[]; optionIds: string[]; unitSen: number; qty: number; note?: string };
 
 type Props = { categories: Category[]; items: Item[]; groups: Group[]; sstRate: number; tables: string[] };
 const CART_KEY = "pos.cart"; // the name the cart is saved under in the browser
@@ -32,6 +32,19 @@ function loadCart(): CartLine[] {
         const saved = localStorage.getItem(CART_KEY);
         const parsed = saved ? JSON.parse(saved) : [];
         return Array.isArray(parsed) ? parsed.filter((l) => l.key && Array.isArray(l.optionIds)) : [];
+    } catch {
+        return [];
+    }
+}
+
+// a parked order: its cart + takeaway/dine-in + table, and a name to find it again
+type Held = { id: string; label: string; lines: CartLine[]; orderType: "takeaway" | "dine_in"; table: string };
+const HELD_KEY = "pos.held";
+
+function loadHeld(): Held[] {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(HELD_KEY) ?? "[]");
+        return Array.isArray(parsed) ? parsed.filter((h) => h.id && Array.isArray(h.lines)) : [];
     } catch {
         return [];
     }
@@ -50,12 +63,19 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
     const [orderType, setOrderType] = useState<"takeaway" | "dine_in">("takeaway");
     const [table, setTable] = useState("");
     const [showCart, setShowCart] = useState(false);
+    const [noteFor, setNoteFor] = useState<string | null>(null);
+    const [held, setHeld] = useState<Held[]>(loadHeld);
+    const [showHeld, setShowHeld] = useState(false);
     const needsTable = orderType === "dine_in" && table.trim() === "";
 
     // every time the cart changes, save it in the browser (so F5 doesn't lose it)
     useEffect(() => {
         localStorage.setItem(CART_KEY, JSON.stringify(cart));
     }, [cart]);
+
+    useEffect(() => {
+        localStorage.setItem(HELD_KEY, JSON.stringify(held));
+    }, [held]);
 
     // items for the selected chip ("all" = every item)
     const shown = activeCat === "all" ? items : items.filter((i) => i.category_id === activeCat);
@@ -119,10 +139,41 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
         );
     }
 
+    // type in a line's note box → save it on that line
+    function changeNote(key: string, note: string) {
+        setCart((lines) => lines.map((l) => (l.key === key ? { ...l, note } : l)));
+    }
+
+    // park the current cart and start fresh (a discount is NOT kept: it needs the PIN again)
+    function holdOrder() {
+        if (cart.length === 0) return;
+        const time = new Date().toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
+        const label = orderType === "dine_in" && table.trim() ? `Table ${table.trim()}` : `Takeaway · ${time}`;
+        setHeld((list) => [...list, { id: String(Date.now()), label, lines: cart, orderType, table }]);
+        setCart([]);
+        setDiscount(null);
+        setTable("");
+        setOrderType("takeaway");
+    }
+
+    // bring a parked order back (only when the cart is empty, so nothing gets lost)
+    function resumeOrder(h: Held) {
+        if (cart.length > 0) return;
+        setCart(h.lines);
+        setOrderType(h.orderType);
+        setTable(h.table);
+        setHeld((list) => list.filter((x) => x.id !== h.id));
+        setShowHeld(false);
+    }
+
+    function deleteHeld(id: string) {
+        setHeld((list) => list.filter((x) => x.id !== id));
+    }
+
     // send the cart to the server; returns an error message, or null if saved
     async function pay(method: Method, tendered: number, payable: number) {
         const result = await placeOrder({
-            lines: cart.map((l) => ({ itemId: l.itemId, qty: l.qty, optionIds: l.optionIds })),
+            lines: cart.map((l) => ({ itemId: l.itemId, qty: l.qty, optionIds: l.optionIds, note: l.note ?? "" })),
             method,
             tendered,
             expectedPayable: payable,
@@ -253,6 +304,12 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
                     Current order <span className="text-base font-semibold text-ink-2">({count} items)</span>
                 </h1>
 
+                {held.length > 0 && (
+                    <button onClick={() => setShowHeld(true)} className="mx-5 mt-2 h-10 rounded-xl border border-amber-300 bg-amber-50 font-semibold text-amber-800">
+                        Held orders ({held.length})
+                    </button>
+                )}
+
 
                 {/* TAKEAWAY / DINE-IN: two buttons side by side (grid-cols-2) */}
                 <div className="mt-3 grid grid-cols-2 gap-2 px-5">
@@ -303,6 +360,25 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
                             </div>
                             {/* chosen options, e.g. "Iced, Oat milk" (text-sm = smaller) */}
                             {l.options.length > 0 && <p className="text-sm text-ink-2">{l.options.join(", ")}</p>}
+                            {/* NOTE: a text box while editing, otherwise the note in italics (tap it to edit) */}
+                            {noteFor === l.key ? (
+                                <input
+                                    autoFocus
+                                    value={l.note ?? ""}
+                                    onChange={(e) => changeNote(l.key, e.target.value)}
+                                    onBlur={() => setNoteFor(null)}
+                                    onKeyDown={(e) => e.key === "Enter" && setNoteFor(null)}
+                                    maxLength={60}
+                                    placeholder="e.g. less sugar, no ice"
+                                    className="mt-2 h-9 w-full rounded-lg bg-tint px-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+                                />
+                            ) : (
+                                l.note && (
+                                    <button onClick={() => setNoteFor(l.key)} className="mt-1 block text-left text-sm italic text-amber-800">
+                                        “{l.note}”
+                                    </button>
+                                )
+                            )}
                             {/* QTY ROW: mt-2 = gap above; items-center = all centred vertically */}
                             <div className="mt-2 flex items-center gap-2">
                                 {/* − / + buttons: h-9 w-9 = square size (make bigger for fingers: h-11 w-11) */}
@@ -318,6 +394,11 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
                                 >
                                     +
                                 </button>
+                                {!l.note && noteFor !== l.key && (
+                                    <button onClick={() => setNoteFor(l.key)} className="ml-2 text-sm font-semibold text-primary">
+                                        + Note
+                                    </button>
+                                )}
                                 {/* unit price, pushed to the right with ml-auto */}
                                 <span className="ml-auto text-sm text-ink-2">@ {formatRM(l.unitSen)}</span>
                             </div>
@@ -365,9 +446,12 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
 
                     {/* BUTTONS: grid-cols-[1fr_2fr] = Clear takes 1 part, Charge 2 parts (Charge is twice as wide)
                         → same width: grid-cols-2. h-14 = button height */}
-                    <div className="mt-4 grid grid-cols-[1fr_2fr] gap-2">
+                    <div className="mt-4 grid grid-cols-[1fr_1fr_2fr] gap-2">
                         <button onClick={() => { setCart([]); setDiscount(null); }} disabled={cart.length === 0} className="h-14 rounded-2xl bg-tint font-semibold disabled:opacity-40">
                             Clear
+                        </button>
+                        <button onClick={holdOrder} disabled={cart.length === 0} className="h-14 rounded-2xl border border-line font-semibold disabled:opacity-40">
+                            Hold
                         </button>
                         <button onClick={() => setPaying(true)} disabled={cart.length === 0 || needsTable} className="h-14 rounded-2xl bg-primary font-bold text-white disabled:opacity-40">
                             {needsTable ? "Enter table no." : `Charge ${formatRM(total)}`}
@@ -406,6 +490,44 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
                     }}
                     onClose={() => setAskDiscount(false)}
                 />
+            )}
+
+            {/* HELD ORDERS pop-up */}
+            {showHeld && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowHeld(false)}>
+                    <div className="w-full max-w-md rounded-3xl bg-surface p-6" onClick={(e) => e.stopPropagation()}>
+                        <h2 className="text-xl font-bold">Held orders</h2>
+                        {cart.length > 0 && (
+                            <p className="mt-1 text-sm font-semibold text-amber-800">Hold or clear the current order before resuming one.</p>
+                        )}
+                        <div className="mt-4 flex flex-col gap-2">
+                            {held.length === 0 && <p className="py-6 text-center text-ink-2">No held orders</p>}
+                            {held.map((h) => {
+                                const qty = h.lines.reduce((n, l) => n + l.qty, 0);
+                                const sen = h.lines.reduce((s, l) => s + l.unitSen * l.qty, 0);
+                                return (
+                                    <div key={h.id} className="flex items-center gap-2 rounded-2xl border border-line p-3">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate font-semibold">{h.label}</p>
+                                            <p className="text-sm text-ink-2">
+                                                {qty} item{qty === 1 ? "" : "s"} · {formatRM(sen)}
+                                            </p>
+                                        </div>
+                                        <button onClick={() => deleteHeld(h.id)} className="h-10 rounded-xl px-3 text-sm font-semibold text-red-700 hover:bg-red-50">
+                                            Delete
+                                        </button>
+                                        <button onClick={() => resumeOrder(h)} disabled={cart.length > 0} className="h-10 rounded-xl bg-primary px-4 font-bold text-white disabled:opacity-40">
+                                            Resume
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <button onClick={() => setShowHeld(false)} className="mt-4 h-12 w-full rounded-2xl bg-tint font-semibold">
+                            Close
+                        </button>
+                    </div>
+                </div>
             )}
 
             {/* "Paid" pop-up after a successful save */}

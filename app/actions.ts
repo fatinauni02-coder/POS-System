@@ -9,7 +9,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 // What the browser sends: only WHAT was ordered — no prices.
 // The database looks up the real prices itself, so nobody can change a price in DevTools.
 export type OrderInput = {
-    lines: { itemId: number; qty: number; optionIds: string[] }[];
+    lines: { itemId: number; qty: number; optionIds: string[]; note: string }[];
     method: string; // "cash" | "card" | "duitnow" | "ewallet"
     tendered: number; // sen received (cash)
     expectedPayable: number; // sen the cashier saw; refused if the real total is different
@@ -57,7 +57,7 @@ export async function placeOrder(input: OrderInput): Promise<OrderResult> {
             tendered: input.tendered,
             expected_payable: input.expectedPayable,
             discount_pct: input.discountPct,
-            lines: input.lines.map((l) => ({ item_id: l.itemId, qty: l.qty, option_ids: l.optionIds })),
+            lines: input.lines.map((l) => ({ item_id: l.itemId, qty: l.qty, option_ids: l.optionIds, note: l.note.trim().slice(0, 60) })),
         },
     });
 
