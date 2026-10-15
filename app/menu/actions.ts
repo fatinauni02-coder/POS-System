@@ -59,6 +59,23 @@ export async function saveItem(formData: FormData) {
     refresh();
 }
 
+export async function deleteItem(formData: FormData) {
+    const business = await getBusiness();
+    if (!business) throw new Error("Shop not found");
+
+    const id = Number(formData.get("id"));
+    if (!Number.isInteger(id)) throw new Error("Bad item id");
+
+    const { error } = await supabaseAdmin
+        .from("menu_items")
+        .delete()
+        .eq("business_id", business.id) // only ever this shop's item
+        .eq("id", id);
+    if (error) throw new Error(error.message);
+
+    redirect("/menu"); // the item is gone, so close the editor
+}
+
 
 
 // ---------- recipes: how much stock 1 sold item uses ----------

@@ -7,6 +7,7 @@ import { toggleSoldOut } from "./actions";
 import { ItemEditor } from "./item-editor";
 import { RecipeEditor } from "./recipe-editor";
 import { ItemOptionGroups } from "./item-option-groups";
+import { DeleteItemButton } from "./delete-item-button";
 
 // "/menu" = Menu management. Suspense shows "Loading…" while Supabase answers.
 export default function MenuPage({ searchParams }: PageProps<"/menu">) {
@@ -80,6 +81,9 @@ async function MenuContent({ searchParams }: { searchParams: PageProps<"/menu">[
                 {/* link to the option groups page */}
                 <Link href="/menu/options" className="mr-3 rounded-2xl border border-line px-5 py-3 font-semibold">
                     Option groups
+                </Link>
+                <Link href="/menu/categories" className="mr-3 rounded-2xl border border-line px-5 py-3 font-semibold">
+                    Categories
                 </Link>
                 {/* "+ Add item" button: px-5 py-3 = button size, rounded-2xl = corners */}
                 <Link href={cat ? `/menu?cat=${cat}&item=new` : "/menu?item=new"} className="rounded-2xl bg-primary px-5 py-3 font-bold text-white">
@@ -177,6 +181,7 @@ async function MenuContent({ searchParams }: { searchParams: PageProps<"/menu">[
                             <ItemEditor key={selected.id} item={selected} categories={categories ?? []} />
                             <ItemOptionGroups menuItemId={selected.id} />
                             <RecipeEditor menuItemId={selected.id} />
+                            <DeleteItemButton id={selected.id} name={selected.name} />
                         </>
                     ) : isNew ? (
                         <ItemEditor
