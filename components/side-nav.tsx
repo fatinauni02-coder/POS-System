@@ -7,15 +7,15 @@ import { usePathname } from "next/navigation";
 // MENU LINKS — add / remove / reorder buttons here.
 // icon = any icon from lucide.dev (import it on line 3 first)
 export const NAV = [
-  { href: "/", label: "Order", icon: ShoppingBasket },
-  { href: "/menu", label: "Menu", icon: UtensilsCrossed },
-  { href: "/stock", label: "Stock", icon: Package },
-  { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/history", label: "History", icon: ReceiptText },
-  { href: "/report", label: "Report", icon: ChartColumn },
+  { href: "/", label: "Order", icon: ShoppingBasket, managerOnly: false },
+  { href: "/menu", label: "Menu", icon: UtensilsCrossed, managerOnly: true },
+  { href: "/stock", label: "Stock", icon: Package, managerOnly: true },
+  { href: "/settings", label: "Settings", icon: Settings, managerOnly: true },
+  { href: "/history", label: "History", icon: ReceiptText, managerOnly: false },
+  { href: "/report", label: "Report", icon: ChartColumn, managerOnly: true },
 ];
 
-export function SideNav() {
+export function SideNav({ isManager }: { isManager: boolean }) {
   const path = usePathname(); // the current address, e.g. "/menu"
 
   return (
@@ -33,7 +33,7 @@ export function SideNav() {
 
       {/* LINKS: gap-1.5 = space between buttons */}
       <nav className="flex flex-col gap-1.5">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.filter((n) => isManager || !n.managerOnly).map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? path === "/" : path.startsWith(href); // true for the page you are on
           return (
             // ONE BUTTON (icon on top, label under it)

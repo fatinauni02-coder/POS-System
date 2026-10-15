@@ -104,6 +104,7 @@ async function Receipt({
                     <Divider />
                     <Row left={`Order #${order.order_no}`} right={METHOD_NAMES[order.payment_method] ?? order.payment_method} bold />
                     <p>{when}</p>
+                    {order.cashier && <p>Cashier: {order.cashier}</p>}
                     <p>{place}</p>
                     <Divider />
 

@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { redirect } from "next/navigation";
 import { getBusiness } from "@/lib/business";
+import { requireManager } from "@/lib/staff";
 
 export async function toggleSoldOut(formData: FormData) {
     const id = Number(formData.get("id"));
@@ -22,6 +23,7 @@ export async function toggleSoldOut(formData: FormData) {
 }
 
 export async function saveItem(formData: FormData) {
+    await requireManager(); // owners/managers only
     const idText = String(formData.get("id") ?? "");
     const name = String(formData.get("name") ?? "").trim();
     const price = Number(formData.get("price"));
@@ -60,6 +62,7 @@ export async function saveItem(formData: FormData) {
 }
 
 export async function deleteItem(formData: FormData) {
+    await requireManager(); // owners/managers only
     const business = await getBusiness();
     if (!business) throw new Error("Shop not found");
 
@@ -90,6 +93,7 @@ async function checkOwnership(businessId: string, menuItemId: number, stockItemI
 }
 
 export async function saveRecipeLine(formData: FormData) {
+    await requireManager(); // owners/managers only
     const business = await getBusiness();
     if (!business) throw new Error("Shop not found");
 
@@ -111,6 +115,7 @@ export async function saveRecipeLine(formData: FormData) {
 }
 
 export async function removeRecipeLine(formData: FormData) {
+    await requireManager(); // owners/managers only
     const business = await getBusiness();
     if (!business) throw new Error("Shop not found");
 
@@ -130,6 +135,7 @@ export async function removeRecipeLine(formData: FormData) {
 // ---------- which option groups an item uses ----------
 
 export async function setItemGroups(formData: FormData) {
+    await requireManager(); // owners/managers only
     const business = await getBusiness();
     if (!business) throw new Error("Shop not found");
 

@@ -25,8 +25,8 @@ const METHODS = [
 ];
 
 type Order = {
-    status: string; payment_method: string | null; subtotal: string; discount: string; sst_amount: string; rounding: string; total: string;
-    order_items: { item_name: string; quantity: number; line_total: string }[]
+    status: string; payment_method: string | null; subtotal: string; discount: string; sst_amount: string; rounding: string; total: string; cashier: string | null
+    order_items: { item_name: string; quantity: number; line_total: string; }[]
 };
 type MoneyColumn = "subtotal" | "discount" | "sst_amount" | "rounding" | "total";
 
@@ -46,7 +46,7 @@ async function Report({ searchParams }: { searchParams: PageProps<"/report">["se
 
     const { data, error } = await supabaseAdmin
         .from("orders")
-        .select("status, payment_method, subtotal, discount, sst_amount, rounding, total, order_items(item_name, quantity, line_total)")
+        .select("status, payment_method, subtotal, discount, sst_amount, rounding, total, cashier, order_items(item_name, quantity, line_total)")
         .eq("business_id", business.id)
         .gte("created_at", `${day}T00:00:00+08:00`)
         .lt("created_at", `${addDays(day, 1)}T00:00:00+08:00`);
@@ -69,6 +69,15 @@ async function Report({ searchParams }: { searchParams: PageProps<"/report">["se
         }
     }
     const items = [...byItem].sort((a, b) => b[1].qty - a[1].qty);
+    // sales per cashier (old orders without a name → "—")
+    const byCashier = new Map<string, { orders: number; sen: number }>();
+    for (const o of paid) {
+        const name = o.cashier ?? "—";
+        const row = byCashier.get(name) ?? { orders: 0, sen: 0 };
+        row.orders += 1;
+        row.sen += toSen(o.total);
+        byCashier.set(name, row);
+    }
 
     const title = new Date(`${day}T12:00:00+08:00`).toLocaleDateString("en-MY", { timeZone: TZ, dateStyle: "full" });
 
@@ -122,6 +131,12 @@ async function Report({ searchParams }: { searchParams: PageProps<"/report">["se
                     <Line label="Total" value={formatRM(net)} bold />
                 </Card>
             </div>
+            <Card title="By cashier">
+                {[...byCashier].map(([name, r]) => (
+                    <Line key={name} label={`${name} (${r.orders})`} value={formatRM(r.sen)} />
+                ))}
+                {byCashier.size === 0 && <p className="text-ink-2">No sales on this day</p>}
+            </Card>
             <Card title={`Items sold (${items.reduce((n, [, r]) => n + r.qty, 0)})`}>
                 {items.length === 0 && <p className="text-ink-2">Nothing sold on this day</p>}
                 {items.map(([name, r]) => (

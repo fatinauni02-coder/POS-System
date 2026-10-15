@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { getBusiness } from "@/lib/business";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireManager } from "@/lib/staff";
 
 const PAGE = "/menu/categories";
 
@@ -32,6 +33,7 @@ function readStation(formData: FormData) {
 }
 
 export async function addCategory(formData: FormData) {
+    await requireManager(); // owners/managers only
     const businessId = await shopId();
     const name = readName(formData);
     const station = readStation(formData);
@@ -55,6 +57,7 @@ export async function addCategory(formData: FormData) {
 }
 
 export async function updateCategory(formData: FormData) {
+    await requireManager(); // owners/managers only
     const businessId = await shopId();
     const id = String(formData.get("id") ?? "");
     const name = readName(formData);
@@ -74,6 +77,7 @@ export async function updateCategory(formData: FormData) {
 }
 
 export async function deleteCategory(formData: FormData) {
+    await requireManager(); // owners/managers only
     const businessId = await shopId();
     const id = String(formData.get("id") ?? "");
 

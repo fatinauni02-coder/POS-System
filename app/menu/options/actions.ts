@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { getBusiness } from "@/lib/business";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireManager } from "@/lib/staff";
 
 // back to /menu/options with a green (msg) or red (error) message
 function back(kind: "msg" | "error", text: string): never {
@@ -27,6 +28,7 @@ async function shopId() {
 // ---------- groups (Temperature, Milk…) ----------
 
 export async function addGroup(formData: FormData) {
+    await requireManager(); // owners/managers only
   const businessId = await shopId();
   const name = String(formData.get("name") ?? "").trim().slice(0, 40);
   const required = formData.get("required") === "on"; // checkbox
@@ -38,6 +40,7 @@ export async function addGroup(formData: FormData) {
 }
 
 export async function toggleRequired(formData: FormData) {
+    await requireManager(); // owners/managers only
   const businessId = await shopId();
   const { error } = await supabaseAdmin
     .from("option_groups")
@@ -49,6 +52,7 @@ export async function toggleRequired(formData: FormData) {
 }
 
 export async function deleteGroup(formData: FormData) {
+    await requireManager(); // owners/managers only
   const businessId = await shopId();
   // its options, item links and stock rules are deleted with it (on delete cascade);
   // old orders keep their own copy of the options, so receipts don't change
@@ -64,6 +68,7 @@ export async function deleteGroup(formData: FormData) {
 // ---------- choices inside a group (Hot, Iced +1.00…) ----------
 
 export async function addOption(formData: FormData) {
+    await requireManager(); // owners/managers only
   const businessId = await shopId();
   const groupId = String(formData.get("group_id") ?? "");
   const name = String(formData.get("name") ?? "").trim().slice(0, 40);
@@ -92,6 +97,7 @@ export async function addOption(formData: FormData) {
 }
 
 export async function removeOption(formData: FormData) {
+    await requireManager(); // owners/managers only
   const businessId = await shopId();
   const { error } = await supabaseAdmin
     .from("options")

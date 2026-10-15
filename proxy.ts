@@ -1,28 +1,34 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// A simple password gate for the WHOLE app — runs before every page and Server Action.
-// The browser shows its own login box. Username: anything. Password: SITE_PASSWORD.
-// If SITE_PASSWORD is not set (e.g. on your laptop), the gate is off.
-export function proxy(request: NextRequest) {
-  const password = process.env.SITE_PASSWORD;
-  if (!password) return NextResponse.next();
+// runs before EVERY page and Server Action:
+// not signed in → go to /login. Signed in and on /login → go to the Order screen.
+export async function proxy(request: NextRequest) {
+  let response = NextResponse.next({ request });
 
-  // the browser sends "Basic <base64 of username:password>"
-  const header = request.headers.get("authorization") ?? "";
-  if (header.startsWith("Basic ")) {
-    const decoded = atob(header.slice(6)); // "anything:the-password"
-    const typed = decoded.slice(decoded.indexOf(":") + 1);
-    if (typed === password) return NextResponse.next(); // right password → carry on
-  }
-
-  // no / wrong password → ask the browser to show its login box
-  return new NextResponse("Password needed", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="POS"' },
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    cookies: {
+      getAll: () => request.cookies.getAll(),
+      // Supabase may renew the login; pass the new cookie on to the page AND the browser
+      setAll: (list) => {
+        list.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        list.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+      },
+    },
   });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const onLogin = request.nextUrl.pathname === "/login";
+
+  if (!user && !onLogin) return NextResponse.redirect(new URL("/login", request.url));
+  if (user && onLogin) return NextResponse.redirect(new URL("/", request.url));
+  return response;
 }
 
-// run on every address except Next.js's own files (CSS, JS, images)
+// every address except Next.js files, the favicon, and the app manifest + icons
 export const config = {
-    matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon-|apple-icon).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon-|apple-icon).*)"],
 };

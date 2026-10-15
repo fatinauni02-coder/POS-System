@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { getBusiness } from "@/lib/business";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireManager } from "@/lib/staff";
 
 // back to /stock with a green (msg) or red (error) message
 function back(kind: "msg" | "error", text: string): never {
@@ -23,6 +24,7 @@ function amount(value: FormDataEntryValue | null) {
 const UNITS = ["pcs", "g", "kg", "ml", "l"];
 
 export async function addStockItem(formData: FormData) {
+    await requireManager(); // owners/managers only
     const business = await getBusiness();
     if (!business) back("error", "Shop not found");
 
@@ -42,6 +44,7 @@ export async function addStockItem(formData: FormData) {
 
 // one form, two buttons: the button you press decides the reason ("delivery" or "waste")
 export async function adjustStock(formData: FormData) {
+    await requireManager(); // owners/managers only
     const business = await getBusiness();
     if (!business) back("error", "Shop not found");
 
@@ -67,6 +70,7 @@ export async function adjustStock(formData: FormData) {
 // ---------- options that change stock (oat milk swap, extras) ----------
 
 export async function addOptionEffect(formData: FormData) {
+    await requireManager(); // owners/managers only
   const business = await getBusiness();
   if (!business) back("error", "Shop not found");
 
@@ -99,6 +103,7 @@ export async function addOptionEffect(formData: FormData) {
 }
 
 export async function removeOptionEffect(formData: FormData) {
+    await requireManager(); // owners/managers only
   const business = await getBusiness();
   if (!business) back("error", "Shop not found");
 

@@ -1,8 +1,11 @@
 import { getBusiness } from "@/lib/business";
+import { signOut } from "@/app/login/actions";
+import { getStaff } from "@/lib/staff";
 
 // TOP BAR — server component (async): reads the shop name + tagline from Supabase
 export async function TopBar() {
   const business = await getBusiness();
+  const staff = await getStaff();
 
   return (
     // h-16 = bar height (also change the fallback h-16 in layout.tsx so they match)
@@ -22,9 +25,16 @@ export async function TopBar() {
         </>
       )}
 
-      {/* ml-auto = push this to the far right (takes all free space on its left)
-          rounded-full + px-3 py-1.5 = pill shape */}
-      <span className="ml-auto rounded-full bg-tint px-3 py-1.5 text-sm font-semibold">Register #1</span>
+      {staff && (
+        <div className="ml-auto flex items-center gap-2">
+          <span className="rounded-full bg-tint px-3 py-1.5 text-sm font-semibold">
+            {staff.email.split("@")[0]} · {staff.role}
+          </span>
+          <form action={signOut}>
+            <button className="rounded-full px-3 py-1.5 text-sm font-semibold text-ink-2 hover:bg-tint">Sign out</button>
+          </form>
+        </div>
+      )}
     </header>
   );
 }

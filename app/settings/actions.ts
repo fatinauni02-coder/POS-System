@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { checkManagerPin, hasManagerPin, setManagerPin } from "@/lib/pin";
 import { getBusiness } from "@/lib/business";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireManager } from "@/lib/staff";
 
 // go back to /settings with a red message
 function fail(message: string): never {
@@ -13,6 +14,7 @@ function fail(message: string): never {
 }
 
 export async function saveSettings(formData: FormData) {
+    await requireManager(); // owners/managers only
     const business = await getBusiness();
     if (!business) fail("Shop not found");
 
@@ -55,6 +57,7 @@ function pinFail(message: string): never {
 }
 
 export async function changePin(formData: FormData) {
+    await requireManager(); // owners/managers only
     const business = await getBusiness();
     if (!business) pinFail("Shop not found");
 

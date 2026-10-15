@@ -1,10 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { Suspense } from "react";
-
-import { SideNav } from "@/components/side-nav";
+import { BottomNavForStaff, SideNavForStaff } from "@/components/role-navs";
 import { TopBar } from "@/components/top-bar";
-import { BottomNav } from "./bottom-nav";
 import "./globals.css";
 
 // Font: downloaded by Next.js, saved into the CSS variable --font-jakarta
@@ -40,7 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex h-dvh">
         {/* SideNav reads the address (usePathname), which only exists when a page is asked for */}
         <Suspense fallback={<aside className="hidden md:block w-[68px] shrink-0 border-r border-line bg-surface print:hidden" />}>
-          <SideNav />
+          <SideNavForStaff />
         </Suspense>
 
         {/* RIGHT COLUMN: flex-col = top bar on top, page below
@@ -57,7 +55,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               overflow-y-auto = only this area scrolls; sidebar + top bar stay still */}
           <div className="flex-1 overflow-y-auto">{children}</div>
           <Suspense fallback={null}>
-            <BottomNav />
+            <BottomNavForStaff />
           </Suspense>
         </div>
       </body>

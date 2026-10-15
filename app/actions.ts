@@ -5,6 +5,7 @@ import { isApproved, makeApproval } from "@/lib/approval";
 import { DISCOUNTS } from "@/lib/money";
 import { checkManagerPin } from "@/lib/pin";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getStaff } from "@/lib/staff"
 
 // What the browser sends: only WHAT was ordered — no prices.
 // The database looks up the real prices itself, so nobody can change a price in DevTools.
@@ -39,6 +40,8 @@ const MESSAGES: Record<string, string> = {
 export async function placeOrder(input: OrderInput): Promise<OrderResult> {
     const business = await getBusiness();
     if (!business) return { ok: false, message: "Shop not found" };
+    const staff = await getStaff();
+    if (!staff) return { ok: false, message: "Please sign in again." };
 
     // a discount only counts with a real approval slip for THIS shop and THIS %
     if (input.discountPct > 0 && !isApproved(input.discountToken, `discount:${business.id}:${input.discountPct}`)) {
@@ -65,8 +68,15 @@ export async function placeOrder(input: OrderInput): Promise<OrderResult> {
         console.error("create_order failed:", error); // shows in the terminal running npm run dev
         return { ok: false, message: MESSAGES[error.message] ?? "Couldn't save the order. Please try again." };
     }
+    // stamp who rang it up (create_order doesn't know about logins, so a second small update)
+    await supabaseAdmin
+        .from("orders")
+        .update({ staff_id: staff.id, cashier: staff.email.split("@")[0] })
+        .eq("business_id", business.id)
+        .eq("id", data.order_id);
     return { ok: true, orderId: data.order_id, orderNo: data.order_no, change: data.change };
 }
+
 
 
 // ---------- discount ----------
