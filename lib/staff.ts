@@ -3,6 +3,7 @@ import { cache } from "react";
 import { getBusiness } from "./business";
 import { supabaseAdmin } from "./supabase-admin";
 import { supabaseAuth } from "./supabase-server";
+import { displayName } from "./username";
 import { redirect } from "next/navigation";
 
 export type Role = "owner" | "manager" | "staff";
@@ -26,7 +27,8 @@ export const getStaff = cache(async () => {
         .maybeSingle();
     if (!data) return null;
 
-    return { id: user.id, email: user.email ?? "", role: data.role as Role };
+    const email = user.email ?? "";
+    return { id: user.id, email, name: displayName(email), role: data.role as Role }; // name = "ali"
 });
 
 // owner/manager only: anyone else is sent back to the Order screen

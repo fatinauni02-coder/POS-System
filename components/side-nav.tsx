@@ -1,6 +1,6 @@
 "use client"; // needs the browser: usePathname reads the current address
 
-import { ChartColumn, Package, ReceiptText, Settings, ShoppingBasket, UtensilsCrossed } from "lucide-react";
+import { ChartColumn, Package, ReceiptText, Settings, ShoppingBasket, Users, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -10,6 +10,7 @@ export const NAV = [
   { href: "/", label: "Order", icon: ShoppingBasket, managerOnly: false },
   { href: "/menu", label: "Menu", icon: UtensilsCrossed, managerOnly: true },
   { href: "/stock", label: "Stock", icon: Package, managerOnly: true },
+  { href: "/staff", label: "Staff", icon: Users, managerOnly: true },
   { href: "/settings", label: "Settings", icon: Settings, managerOnly: true },
   { href: "/history", label: "History", icon: ReceiptText, managerOnly: false },
   { href: "/report", label: "Report", icon: ChartColumn, managerOnly: true },

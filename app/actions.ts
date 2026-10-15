@@ -71,7 +71,7 @@ export async function placeOrder(input: OrderInput): Promise<OrderResult> {
     // stamp who rang it up (create_order doesn't know about logins, so a second small update)
     await supabaseAdmin
         .from("orders")
-        .update({ staff_id: staff.id, cashier: staff.email.split("@")[0] })
+        .update({ staff_id: staff.id, cashier: staff.name })
         .eq("business_id", business.id)
         .eq("id", data.order_id);
     return { ok: true, orderId: data.order_id, orderNo: data.order_no, change: data.change };

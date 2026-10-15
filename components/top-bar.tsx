@@ -28,7 +28,7 @@ export async function TopBar() {
       {staff && (
         <div className="ml-auto flex items-center gap-2">
           <span className="rounded-full bg-tint px-3 py-1.5 text-sm font-semibold">
-            {staff.email.split("@")[0]} · {staff.role}
+            {staff.name} · {staff.role}
           </span>
           <form action={signOut}>
             <button className="rounded-full px-3 py-1.5 text-sm font-semibold text-ink-2 hover:bg-tint">Sign out</button>

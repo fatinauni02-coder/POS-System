@@ -2,9 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { supabaseAuth } from "@/lib/supabase-server";
+import { toLoginEmail } from "@/lib/username";
 
 export async function signIn(formData: FormData) {
-    const email = String(formData.get("email") ?? "").trim();
+    const email = toLoginEmail(String(formData.get("username") ?? "")); // "ali" → "ali@kopi-co.pos"
     const password = String(formData.get("password") ?? "");
 
     const supabase = await supabaseAuth();
