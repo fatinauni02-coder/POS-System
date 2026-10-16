@@ -11,10 +11,11 @@ export type Role = "owner" | "manager" | "staff";
 // the signed-in person + their role in THIS shop; null = not signed in or not staff here
 export const getStaff = cache(async () => {
     const supabase = await supabaseAuth();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return null;
+    // getClaims() = the signed-in person from the (checked) login cookie, without a trip to Supabase Auth
+    const { data: auth } = await supabase.auth.getClaims();
+    const claims = auth?.claims;
+    if (!claims) return null;
+    const user = { id: claims.sub, email: typeof claims.email === "string" ? claims.email : undefined };
 
     const business = await getBusiness();
     if (!business) return null;

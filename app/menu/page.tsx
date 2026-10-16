@@ -30,20 +30,15 @@ async function MenuContent({ searchParams }: { searchParams: PageProps<"/menu">[
     if (!business)
         return <p className="text-red-600">Shop not found</p>;
 
-    // 2 categories
-    const { data: categories } = await supabase
-        .from("categories")
-        .select("id, name, station")
-        .eq("business_id", business.id)
-        .order("sort_order");
-
-
-    // 3 menu items
-    const { data: items, error: itemsError } = await supabase
-        .from("menu_items")
-        .select("id, name, description, price, category_id, is_available")
-        .eq("business_id", business.id)
-        .order("name");
+    // categories + items AT THE SAME TIME (one wait instead of two)
+    const [{ data: categories }, { data: items, error: itemsError }] = await Promise.all([
+        supabase.from("categories").select("id, name, station").eq("business_id", business.id).order("sort_order"),
+        supabase
+            .from("menu_items")
+            .select("id, name, description, price, category_id, is_available")
+            .eq("business_id", business.id)
+            .order("name"),
+    ]);
 
     if (itemsError)
         return <p className="text-red-600">Error: {itemsError.message}</p>;

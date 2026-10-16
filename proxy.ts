@@ -18,9 +18,10 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() checks the login cookie's signature right here (no trip to Supabase on every click,
+  // unlike getUser()). It also refreshes an expired login via setAll above.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
   const onLogin = request.nextUrl.pathname === "/login";
 
   if (!user && !onLogin) return NextResponse.redirect(new URL("/login", request.url));
