@@ -7,6 +7,9 @@ import { getBusiness } from "@/lib/business";
 import { requireManager } from "@/lib/staff";
 
 export async function toggleSoldOut(formData: FormData) {
+    const business = await getBusiness();
+    if (!business) throw new Error("Shop not found");
+
     const id = Number(formData.get("id"));
     const isAvailable = formData.get("available") === "true";
 
@@ -15,7 +18,8 @@ export async function toggleSoldOut(formData: FormData) {
     const { error } = await supabaseAdmin
         .from("menu_items")
         .update({ is_available: !isAvailable })
-        .eq("id", id); // w/o eq it would change all items in the table, not just the one with the given id
+        .eq("business_id", business.id) // only THIS shop's item
+        .eq("id", id);
 
     if (error) throw new Error(error.message);
 
@@ -24,6 +28,8 @@ export async function toggleSoldOut(formData: FormData) {
 
 export async function saveItem(formData: FormData) {
     await requireManager(); // owners/managers only
+    const business = await getBusiness();
+    if (!business) throw new Error ("Shop not found");
     const idText = String(formData.get("id") ?? "");
     const name = String(formData.get("name") ?? "").trim();
     const price = Number(formData.get("price"));
@@ -38,9 +44,6 @@ export async function saveItem(formData: FormData) {
 
     // no id = a NEW item → insert
     if (idText === "") {
-        const business = await getBusiness();
-        if (!business) throw new Error("Shop not found");
-
         const { data, error } = await supabaseAdmin
             .from("menu_items")
             .insert({ ...values, business_id: business.id })
@@ -55,7 +58,7 @@ export async function saveItem(formData: FormData) {
     const id = Number(idText);
     if (!Number.isInteger(id)) throw new Error("Bad item id");
 
-    const { error } = await supabaseAdmin.from("menu_items").update(values).eq("id", id);
+    const { error } = await supabaseAdmin.from("menu_items").update(values).eq("business_id", business.id).eq("id", id);
     if (error) throw new Error(error.message);
 
     refresh();

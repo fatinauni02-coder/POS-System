@@ -46,7 +46,7 @@ async function History({ searchParams }: { searchParams: PageProps<"/history">["
   const title = new Date(`${day}T12:00:00+08:00`).toLocaleDateString("en-MY", { timeZone: TZ, dateStyle: "full" });
 
   return (
-    <div className="flex flex-col gap-5 p-6">
+    <div className="flex flex-col gap-5 p-4 md:p-6">
       {/* HEADER: title on the left, day buttons on the right */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="mr-auto">
@@ -69,7 +69,7 @@ async function History({ searchParams }: { searchParams: PageProps<"/history">["
       </div>
 
       {/* SUMMARY: 4 boxes in a row */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Orders" value={String(paid.length)} />
         <Stat label="Sales" value={formatRM(sales)} />
         <Stat label="Cash" value={formatRM(cash)} />
@@ -88,7 +88,7 @@ async function History({ searchParams }: { searchParams: PageProps<"/history">["
             <Link
               key={o.id}
               href={`/receipt/${o.id}`}
-              className={`flex items-center gap-4 border-b border-line px-5 py-3 last:border-b-0 hover:bg-tint ${
+              className={`flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0 hover:bg-tint ${
                 o.status === "refunded" ? "opacity-60" : ""
               }`}
             >
@@ -97,9 +97,9 @@ async function History({ searchParams }: { searchParams: PageProps<"/history">["
               <span className="flex-1 text-ink-2">
                 {items} item{items === 1 ? "" : "s"}
               </span>
-              <span className="w-28 text-ink-2">{METHOD_NAMES[o.payment_method] ?? o.payment_method}</span>
+              <span className="hidden w-28 text-ink-2 sm:block">{METHOD_NAMES[o.payment_method] ?? o.payment_method}</span>
               {o.status === "refunded" && (
-                <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-700 uppercase">Refunded</span>
+                <span className="hidden rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-700 uppercase sm:inline">Refunded</span>
               )}
               <span className={`w-24 text-right font-bold ${o.status === "refunded" ? "line-through" : ""}`}>
                 {formatRM(toSen(o.total))}

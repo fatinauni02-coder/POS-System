@@ -55,6 +55,8 @@ async function MenuContent({ searchParams }: { searchParams: PageProps<"/menu">[
     const selected = allItems.find((i) => i.id === itemId);
     // helper to generate the link to an item, preserving the category filter if any
     const itemHref = (id: number) => (cat ? `/menu?cat=${cat}&item=${id}` : `/menu?item=${id}`);
+    const editing = selected !== undefined || isNew;
+    const backHref = cat ? `/menu?cat=${cat}` : "/menu";
 
     // PAGE SHAPE:
     //   ┌───────────────────────────────────────────────┐
@@ -70,7 +72,7 @@ async function MenuContent({ searchParams }: { searchParams: PageProps<"/menu">[
             {/* HEADER
                 items-center = title and button centred vertically
                 border-b = line under it; px-6 py-4 = inner space (sides / top+bottom) */}
-            <div className="flex items-center border-b border-line bg-surface px-6 py-4">
+            <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface px-4 py-4 lg:px-6">
                 {/* mr-auto = takes the free space, so the button is pushed to the right */}
                 <div className="mr-auto">
                     <h1 className="text-2xl font-bold tracking-tight">Menu management</h1>
@@ -92,15 +94,15 @@ async function MenuContent({ searchParams }: { searchParams: PageProps<"/menu">[
             </div>
 
             {/* 3 COLUMNS
-                flex = columns side by side; gap-5 = space between columns; p-6 = space around
+                below lg (1024px): stacked, one thing at a time; from lg: 3 columns side by side
                 flex-1 = fill the height under the header
                 min-h-0 = lets the middle column scroll instead of making the page taller */}
-            <div className="flex min-h-0 flex-1 gap-5 p-6">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 lg:flex-row lg:gap-5 lg:p-6">
                 {/* LEFT: categories
                     w-48 = width on normal screens; xl:w-60 = wider on big screens (≥1280px)
                     shrink-0 = keep that width; self-start = box only as tall as its content */}
-                <nav className="w-48 shrink-0 xl:w-60 self-start rounded-2xl border border-line bg-surface p-3">
-                    <p className="px-2 pb-2 text-[11px] font-bold tracking-wider text-ink-2 uppercase">Categories</p>
+                <nav className={`${editing ? "hidden" : "flex"} shrink-0 gap-2 overflow-x-auto rounded-2xl border border-line bg-surface p-2 lg:block lg:w-48 lg:self-start lg:p-3 xl:w-60`}>
+                    <p className="hidden px-2 pb-2 text-[11px] font-bold tracking-wider text-ink-2 uppercase lg:block">Categories</p>
                     <CategoryLink href="/menu" name="All items" count={allItems.length} active={!cat} />
                     {categories?.map((c) => (
                         <CategoryLink
@@ -117,7 +119,7 @@ async function MenuContent({ searchParams }: { searchParams: PageProps<"/menu">[
                     flex-1 = takes all the width the side columns don't use
                     min-w-0 = allows long names to be cut with "…" instead of widening the page
                     gap-3 = space between rows; overflow-y-auto = this column scrolls */}
-                <section className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto pb-6">
+                <section className={`${editing ? "hidden lg:flex" : "flex"} min-w-0 flex-1 flex-col gap-3 overflow-y-auto pb-6`}>
                     {shown.length === 0 && <p className="py-16 text-center text-ink-2">No items in this category yet</p>}
 
                     {shown.map((i) => (
@@ -174,8 +176,13 @@ async function MenuContent({ searchParams }: { searchParams: PageProps<"/menu">[
                 {/* RIGHT: editor
                     w-[300px] = width on normal screens; xl:w-[380px] = wider on big screens
                     self-start = only as tall as the form */}
-                <aside className="w-[300px] shrink-0 self-start rounded-2xl border border-line bg-surface xl:w-[380px]">
+                <aside className={`${editing ? "" : "hidden lg:block"} w-full shrink-0 self-start rounded-2xl border border-line bg-surface lg:w-[300px] xl:w-[380px]`}>
                     {/* key = a new key makes React start a fresh editor (clears the inputs) */}
+                    {editing && (
+                        <Link href={backHref} className="block px-5 pt-4 font-semibold text-primary lg:hidden">
+                            ← Back to items
+                        </Link>
+                    )}
                     {selected ? (
                         <>
                             <ItemEditor key={selected.id} item={selected} categories={categories ?? []} />
@@ -204,7 +211,7 @@ function CategoryLink({ href, name, count, active }: { href: string; name: strin
     return (
         <Link
             href={href}
-            className={`mb-1 flex items-center justify-between rounded-xl px-3 py-2.5 font-semibold ${active ? "bg-primary-soft text-white" : "hover:bg-tint"
+            className={`flex shrink-0 items-center justify-between gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 font-semibold lg:mb-1 ${active ? "bg-primary-soft text-white" : "hover:bg-tint"
                 }`}
         >
             {name}
