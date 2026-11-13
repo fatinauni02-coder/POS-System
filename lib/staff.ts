@@ -5,11 +5,13 @@ import { supabaseAdmin } from "./supabase-admin";
 import { supabaseAuth } from "./supabase-server";
 import { displayName } from "./username";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 
 export type Role = "owner" | "manager" | "staff";
 
 // the signed-in person + their role in THIS shop; null = not signed in or not staff here
 export const getStaff = cache(async () => {
+    await connection(); // who's logged in depends on THIS request, so don't prerender
     const supabase = await supabaseAuth();
     // getClaims() = the signed-in person from the (checked) login cookie, without a trip to Supabase Auth
     const { data: auth } = await supabase.auth.getClaims();
