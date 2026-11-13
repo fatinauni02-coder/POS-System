@@ -3,8 +3,10 @@ import { Suspense } from "react";
 import { OptionEffects } from "./option-effects";
 import { getBusiness } from "@/lib/business";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { addStockItem, adjustStock } from "./actions";
+import { addStockItem, adjustStock, updateStockItem } from "./actions";
+import { DeleteStockButton } from "./delete-stock-button";
 import Link from "next/link";
+import { Toast } from "@/components/toast";
 
 export default function StockPage({ searchParams }: PageProps<"/stock">) {
     return (
@@ -18,6 +20,7 @@ const INPUT = "h-11 rounded-xl bg-tint px-3 font-semibold outline-none focus:rin
 
 async function Stock({ searchParams }: { searchParams: PageProps<"/stock">["searchParams"] }) {
     const params = await searchParams;
+    const editId = typeof params.edit === "string" ? params.edit : null;
     await connection(); // always show the amounts as they are right now
 
     const business = await getBusiness();
@@ -55,8 +58,9 @@ async function Stock({ searchParams }: { searchParams: PageProps<"/stock">["sear
                 </p>
             </div>
 
-            {typeof params.msg === "string" && <p className="rounded-xl bg-green-50 p-3 font-semibold text-green-800">{params.msg}</p>}
-            {typeof params.error === "string" && <p className="rounded-xl bg-red-50 p-3 font-semibold text-red-700">{params.error}</p>}
+            {/* green / red message → pop-up at the bottom-right; key = new time → new toast */}
+            {typeof params.msg === "string" && <Toast key={String(params.t)} kind="msg" text={params.msg} />}
+            {typeof params.error === "string" && <Toast key={String(params.t)} kind="error" text={params.error} />}
 
             {/* ADD A NEW STOCK ITEM — one row of boxes + button */}
             <form action={addStockItem} className="flex flex-wrap items-end gap-3 rounded-2xl border border-line bg-surface p-4">
@@ -85,41 +89,76 @@ async function Stock({ searchParams }: { searchParams: PageProps<"/stock">["sear
             <div className="overflow-hidden rounded-2xl border border-line bg-surface">
                 {list.length === 0 && <p className="p-10 text-center text-ink-2">No stock items yet — add one above</p>}
 
-                {list.map((s) => (
-                    <div key={s.id} className="flex flex-wrap items-center gap-4 border-b border-line px-5 py-3 last:border-b-0">
-                        <div className="min-w-40 flex-1">
-                            <p className="font-semibold">{s.name}</p>
-                            <p className="text-sm text-ink-2">
-                                warn below {s.low} {s.unit}
-                            </p>
-                        </div>
-
-                        <p className="w-32 text-right text-lg font-bold">
-                            {s.qty} <span className="text-sm font-semibold text-ink-2">{s.unit}</span>
-                        </p>
-
-                        {/* status badge: green / amber / red */}
-                        <span
-                            className={`w-16 rounded-full py-0.5 text-center text-xs font-bold uppercase ${s.status === "out" ? "bg-red-50 text-red-700" : s.status === "low" ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"
-                                }`}
-                        >
-                            {s.status === "ok" ? "OK" : s.status}
-                        </span>
-
-                        {/* one small form, TWO submit buttons: the pressed button sends name="reason" with its value */}
-                        <form action={adjustStock} className="flex items-center gap-2">
+                {list.map((s) =>
+                    editId === String(s.id) ? (
+                        // EDIT MODE for this one row
+                        <form key={s.id} action={updateStockItem} className="flex flex-wrap items-end gap-3 border-b border-line bg-tint/40 px-5 py-4 last:border-b-0">
                             <input type="hidden" name="id" value={s.id} />
-                            <input type="hidden" name="name" value={s.name} />
-                            <input name="qty" inputMode="decimal" placeholder={s.unit} aria-label={`Amount of ${s.name}`} className={`${INPUT} w-24 text-right`} />
-                            <button name="reason" value="delivery" className="h-11 rounded-xl bg-green-700 px-3 text-sm font-bold text-white">
-                                + Receive
-                            </button>
-                            <button name="reason" value="waste" className="h-11 rounded-xl border border-red-200 px-3 text-sm font-bold text-red-700">
-                                − Waste
-                            </button>
+                            <label className="flex min-w-40 flex-1 flex-col text-sm font-semibold text-ink-2">
+                                Name
+                                <input name="name" required maxLength={60} defaultValue={s.name} className={`${INPUT} mt-1`} />
+                            </label>
+                            <label className="flex flex-col text-sm font-semibold text-ink-2">
+                                Unit
+                                <select name="unit" defaultValue={s.unit} className={`${INPUT} mt-1`}>
+                                    <option value="pcs">pcs</option>
+                                    <option value="g">g</option>
+                                    <option value="kg">kg</option>
+                                    <option value="ml">ml</option>
+                                    <option value="l">l</option>
+                                </select>
+                            </label>
+                            <label className="flex w-36 flex-col text-sm font-semibold text-ink-2">
+                                Warn when below
+                                <input name="low_level" inputMode="decimal" defaultValue={s.low} className={`${INPUT} mt-1`} />
+                            </label>
+                            <button className="h-11 rounded-xl bg-primary px-5 font-bold text-white">Save</button>
+                            <Link href="/stock" className="flex h-11 items-center rounded-xl px-4 font-semibold text-ink-2 hover:bg-tint">
+                                Cancel
+                            </Link>
+                            <DeleteStockButton name={s.name} />
+                            <p className="w-full text-xs text-ink-2">Changing the unit doesn&apos;t convert the amount or recipes. Deleting also removes this item&apos;s stock history.</p>
                         </form>
-                    </div>
-                ))}
+                    ) : (
+                        // NORMAL ROW (same as before, plus an Edit link)
+                        <div key={s.id} className="flex flex-wrap items-center gap-4 border-b border-line px-5 py-3 last:border-b-0">
+                            <div className="min-w-40 flex-1">
+                                <p className="font-semibold">
+                                    {s.name}{" "}
+                                    <Link href={`/stock?edit=${s.id}`} className="ml-1 text-sm font-semibold text-primary underline">
+                                        Edit
+                                    </Link>
+                                </p>
+                                <p className="text-sm text-ink-2">
+                                    warn below {s.low} {s.unit}
+                                </p>
+                            </div>
+
+                            <p className="w-32 text-right text-lg font-bold">
+                                {s.qty} <span className="text-sm font-semibold text-ink-2">{s.unit}</span>
+                            </p>
+
+                            <span
+                                className={`w-16 rounded-full py-0.5 text-center text-xs font-bold uppercase ${s.status === "out" ? "bg-red-50 text-red-700" : s.status === "low" ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"
+                                    }`}
+                            >
+                                {s.status === "ok" ? "OK" : s.status}
+                            </span>
+
+                            <form action={adjustStock} className="flex items-center gap-2">
+                                <input type="hidden" name="id" value={s.id} />
+                                <input type="hidden" name="name" value={s.name} />
+                                <input name="qty" inputMode="decimal" placeholder={s.unit} aria-label={`Amount of ${s.name}`} className={`${INPUT} w-24 text-right`} />
+                                <button name="reason" value="delivery" className="h-11 rounded-xl bg-green-700 px-3 text-sm font-bold text-white">
+                                    + Receive
+                                </button>
+                                <button name="reason" value="waste" className="h-11 rounded-xl border border-red-200 px-3 text-sm font-bold text-red-700">
+                                    − Waste
+                                </button>
+                            </form>
+                        </div>
+                    ),
+                )}
             </div>
             {/* OPTIONS THAT CHANGE STOCK (its own server component, loads its own data) */}
             <OptionEffects />

@@ -9,68 +9,124 @@ import { requireManager } from "@/lib/staff";
 
 // back to /stock with a green (msg) or red (error) message
 function back(kind: "msg" | "error", text: string): never {
-    revalidatePath("/stock");
-    redirect(`/stock?${kind}=${encodeURIComponent(text)}`);
+  revalidatePath("/stock");
+  redirect(`/stock?${kind}=${encodeURIComponent(text)}&t=${Date.now()}`); // t = time, so the same message twice still pops up
 }
 
 // "12.5" → 12.5 ; anything else (empty, letters, negative, too many decimals) → null
 function amount(value: FormDataEntryValue | null) {
-    const text = String(value ?? "").trim();
-    if (!/^\d+(\.\d{1,2})?$/.test(text)) return null;
-    const n = Number(text);
-    return n > 0 && n <= 100000 ? n : null;
+  const text = String(value ?? "").trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(text)) return null;
+  const n = Number(text);
+  return n > 0 && n <= 100000 ? n : null;
 }
 
 const UNITS = ["pcs", "g", "kg", "ml", "l"];
 
 export async function addStockItem(formData: FormData) {
-    await requireManager(); // owners/managers only
-    const business = await getBusiness();
-    if (!business) back("error", "Shop not found");
+  await requireManager(); // owners/managers only
+  const business = await getBusiness();
+  if (!business) back("error", "Shop not found");
 
-    const name = String(formData.get("name") ?? "").trim().slice(0, 60);
-    const unit = String(formData.get("unit") ?? "");
-    const lowText = String(formData.get("low_level") ?? "").trim();
-    const lowLevel = lowText === "" ? 0 : amount(lowText);
+  const name = String(formData.get("name") ?? "").trim().slice(0, 60);
+  const unit = String(formData.get("unit") ?? "");
+  const lowText = String(formData.get("low_level") ?? "").trim();
+  const lowLevel = lowText === "" ? 0 : amount(lowText);
 
-    if (!name) back("error", "Give the stock item a name");
-    if (!UNITS.includes(unit)) back("error", "Pick a unit");
-    if (lowLevel === null) back("error", "Low level must be a number like 500 or 2.5");
+  if (!name) back("error", "Give the stock item a name");
+  if (!UNITS.includes(unit)) back("error", "Pick a unit");
+  if (lowLevel === null) back("error", "Low level must be a number like 500 or 2.5");
 
-    const { error } = await supabaseAdmin.from("stock_items").insert({ business_id: business.id, name, unit, low_level: lowLevel });
-    if (error) back("error", error.code === "23505" ? `"${name}" already exists` : error.message);
-    back("msg", `Added ${name}. Now receive the first delivery.`);
+  const { error } = await supabaseAdmin.from("stock_items").insert({ business_id: business.id, name, unit, low_level: lowLevel });
+  if (error) back("error", error.code === "23505" ? `"${name}" already exists` : error.message);
+  back("msg", `Added ${name}. Now receive the first delivery.`);
 }
 
-// one form, two buttons: the button you press decides the reason ("delivery" or "waste")
-export async function adjustStock(formData: FormData) {
+export async function updateStockItem(formData: FormData) {
+  await requireManager(); // owners/managers only
+  const business = await getBusiness();
+  if (!business) back("error", "Shop not found");
+
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim().slice(0, 60);
+  const unit = String(formData.get("unit") ?? "");
+  const lowText = String(formData.get("low_level") ?? "").trim();
+  const lowLevel = lowText === "" || Number(lowText) === 0 ? 0 : amount(lowText);
+
+  if (!name) back("error", "Give the stock item a name");
+  if (!UNITS.includes(unit)) back("error", "Pick a unit");
+  if (lowLevel === null) back("error", "Low level must be a number like 500 or 2.5");
+
+  const { error } = await supabaseAdmin
+    .from("stock_items")
+    .update({ name, unit, low_level: lowLevel })
+    .eq("business_id", business.id) // only THIS shop's item (the id came from the browser)
+    .eq("id", id);
+  if (error) back("error", error.code === "23505" ? `"${name}" already exists` : error.message);
+  back("msg", `Saved ${name}`);
+}
+
+export async function deleteStockItem(formData: FormData) {
     await requireManager(); // owners/managers only
     const business = await getBusiness();
     if (!business) back("error", "Shop not found");
 
     const id = String(formData.get("id") ?? "");
     const name = String(formData.get("name") ?? "");
-    const reason = String(formData.get("reason") ?? "");
-    const qty = amount(formData.get("qty"));
-    if (qty === null) back("error", `Type how much ${name} first (e.g. 500)`);
-    if (reason !== "delivery" && reason !== "waste") back("error", "Unknown action");
+    // ids are uuids: check the shape first, because it goes inside the .or() text below
+    if (!/^[0-9a-f-]{36}$/i.test(id)) back("error", "Stock item not found");
 
-    // migration 008: changes the amount AND writes the history, in one step
-    const { error } = await supabaseAdmin.rpc("adjust_stock", {
-        p_business_id: business.id,
-        p_stock_item_id: id,
-        p_change: reason === "delivery" ? qty : -qty, // waste takes away
-        p_reason: reason,
-    });
-    if (error) back("error", error.message === "NOT_ENOUGH" ? `Not that much ${name} in stock` : error.message);
-    back("msg", reason === "delivery" ? `Received ${qty} of ${name}` : `Wasted ${qty} of ${name}`);
+    // still used? count recipe lines + option rules (head: true = count only, no rows)
+    const [{ count: recipes }, { count: rules }] = await Promise.all([
+        supabaseAdmin
+            .from("menu_item_recipes")
+            .select("*", { count: "exact", head: true })
+            .eq("business_id", business.id)
+            .eq("stock_item_id", id),
+        supabaseAdmin
+            .from("option_stock_effects")
+            .select("*", { count: "exact", head: true })
+            .eq("business_id", business.id)
+            .or(`stock_item_id.eq.${id},replaces_stock_item_id.eq.${id}`),
+    ]);
+    if ((recipes ?? 0) + (rules ?? 0) > 0) {
+        back("error", `${name} is still used by ${recipes ?? 0} recipe(s) and ${rules ?? 0} option rule(s). Remove those first.`);
+    }
+
+    const { error } = await supabaseAdmin.from("stock_items").delete().eq("business_id", business.id).eq("id", id);
+    if (error) back("error", error.message);
+    back("msg", `Deleted ${name}`);
+}
+
+// one form, two buttons: the button you press decides the reason ("delivery" or "waste")
+export async function adjustStock(formData: FormData) {
+  await requireManager(); // owners/managers only
+  const business = await getBusiness();
+  if (!business) back("error", "Shop not found");
+
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "");
+  const reason = String(formData.get("reason") ?? "");
+  const qty = amount(formData.get("qty"));
+  if (qty === null) back("error", `Type how much ${name} first (e.g. 500)`);
+  if (reason !== "delivery" && reason !== "waste") back("error", "Unknown action");
+
+  // migration 008: changes the amount AND writes the history, in one step
+  const { error } = await supabaseAdmin.rpc("adjust_stock", {
+    p_business_id: business.id,
+    p_stock_item_id: id,
+    p_change: reason === "delivery" ? qty : -qty, // waste takes away
+    p_reason: reason,
+  });
+  if (error) back("error", error.message === "NOT_ENOUGH" ? `Not that much ${name} in stock` : error.message);
+  back("msg", reason === "delivery" ? `Received ${qty} of ${name}` : `Wasted ${qty} of ${name}`);
 }
 
 
 // ---------- options that change stock (oat milk swap, extras) ----------
 
 export async function addOptionEffect(formData: FormData) {
-    await requireManager(); // owners/managers only
+  await requireManager(); // owners/managers only
   const business = await getBusiness();
   if (!business) back("error", "Shop not found");
 
@@ -103,7 +159,7 @@ export async function addOptionEffect(formData: FormData) {
 }
 
 export async function removeOptionEffect(formData: FormData) {
-    await requireManager(); // owners/managers only
+  await requireManager(); // owners/managers only
   const business = await getBusiness();
   if (!business) back("error", "Shop not found");
 
