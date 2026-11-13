@@ -26,7 +26,7 @@ type Line = {
     item_name: string;
     quantity: number;
     line_total: number | string;
-    options: { name: string }[];
+    options: { name: string; group?: string; price_sen?: number }[];
     notes: string | null;
     station: string | null;
 };
@@ -109,19 +109,33 @@ async function Receipt({
                     <Divider />
 
                     {/* LINES */}
-                    {lines.map((line) => (
-                        <div key={line.id} className="mb-1">
-                            <Row left={`${line.quantity} x ${line.item_name}`} right={formatRM(toSen(line.line_total))} />
-                            {line.options.length > 0 && <p className="pl-4">{line.options.map((o) => o.name).join(", ")}</p>}
-                            {/* NEW: the item note */}
-                            {line.notes && <p className="pl-4 italic">&quot;{line.notes}&quot;</p>}
-                        </div>
-                    ))}
+                    {lines.map((line) => {
+                        const { temp, addOns } = splitOptions(line.options);
+                        // add-on money for this line (price × quantity)
+                        const addOnSen = addOns.reduce((sum, o) => sum + (o.price_sen ?? 0), 0) * line.quantity;
+                        // what's left = item price + temperature extra
+                        const mainSen = toSen(line.line_total) - addOnSen;
+
+                        return (
+                            <div key={line.id} className="mb-1">
+                                <Row left={`${line.quantity} x ${temp ? temp.name + " " : ""}${line.item_name}`} right={formatRM(mainSen)} />
+                                {addOns.map((o) => (
+                                    <div key={o.name} className="pl-4">
+                                        <Row left={`+ ${o.name}`} right={o.price_sen ? formatRM(o.price_sen * line.quantity) : ""} />
+                                    </div>
+                                ))}
+                                {line.notes && <p className="pl-4 italic">&quot;{line.notes}&quot;</p>}
+                            </div>
+                        );
+                    })}
 
                     <Divider />
                     <Row left="Subtotal" right={formatRM(toSen(order.subtotal))} />
                     {toSen(order.discount) > 0 && (
                         <Row left={`Discount ${Number(order.discount_pct)}%`} right={`-${formatRM(toSen(order.discount))}`} />
+                    )}
+                    {toSen(order.sst_amount) > 0 && (
+                        <Row left={`SST ${Number(order.sst_rate)}%`} right={formatRM(toSen(order.sst_amount))} />
                     )}
                     {rounding !== 0 && <Row left="Rounding" right={`${rounding < 0 ? "-" : ""}${formatRM(Math.abs(rounding))}`} />}
                     <Row left="TOTAL" right={formatRM(toSen(order.total))} bold />
@@ -183,15 +197,23 @@ function Ticket({
             <p className="text-lg font-bold">{place}</p>
             <p className="text-[12px]">{when}</p>
             <Divider />
-            {lines.map((l) => (
-                <div key={l.id} className="mb-3">
-                    <p className="text-xl font-bold">
-                        {l.quantity} x {l.item_name}
-                    </p>
-                    {l.options.length > 0 && <p className="pl-4 text-base">{l.options.map((o) => o.name).join(", ")}</p>}
-                    {l.notes && <p className="pl-4 text-base font-bold">** {l.notes}</p>}
-                </div>
-            ))}
+            {lines.map((l) => {
+                const { temp, addOns } = splitOptions(l.options);
+                return (
+                    <div key={l.id} className="mb-3">
+                        <p className="text-xl font-bold">
+                            {l.quantity} x {temp ? temp.name + " " : ""}
+                            {l.item_name}
+                        </p>
+                        {addOns.map((o) => (
+                            <p key={o.name} className="pl-4 text-base">
+                                + {o.name}
+                            </p>
+                        ))}
+                        {l.notes && <p className="pl-4 text-base font-bold">** {l.notes}</p>}
+                    </div>
+                );
+            })}
         </div>
     );
 }
@@ -218,4 +240,10 @@ function Row({ left, right, bold }: { left: string; right: string; bold?: boolea
 // dashed line across the receipt
 function Divider() {
     return <div className="my-2 border-t border-dashed border-black" />;
+}
+
+// "Iced" goes into the item name; every other option is listed under it
+function splitOptions(options: Line["options"]) {
+    const temp = options.find((o) => o.group === "Temperature");
+    return { temp, addOns: options.filter((o) => o !== temp) };
 }
