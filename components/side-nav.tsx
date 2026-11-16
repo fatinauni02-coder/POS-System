@@ -1,6 +1,6 @@
 "use client"; // needs the browser: usePathname reads the current address
 
-import { ChartColumn, Package, ReceiptText, Settings, ShoppingBasket, Users, UtensilsCrossed } from "lucide-react";
+import { ChartColumn, Package, ReceiptText, Settings, ShoppingBasket, Users, UtensilsCrossed, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 // icon = any icon from lucide.dev (import it on line 3 first)
 export const NAV = [
   { href: "/", label: "Order", icon: ShoppingBasket, managerOnly: false },
+  { href: "/tables", label: "Tables", icon: LayoutGrid, managerOnly: false, restaurantOnly: true },
   { href: "/menu", label: "Menu", icon: UtensilsCrossed, managerOnly: true },
   { href: "/stock", label: "Stock", icon: Package, managerOnly: true },
   { href: "/staff", label: "Staff", icon: Users, managerOnly: true },
@@ -16,7 +17,13 @@ export const NAV = [
   { href: "/report", label: "Report", icon: ChartColumn, managerOnly: true },
 ];
 
-export function SideNav({ isManager }: { isManager: boolean }) {
+// which links this person sees: managers see everything, staff don't see managerOnly;
+// "Tables" only when the shop is in restaurant mode
+export function visibleNav(isManager: boolean, isRestaurant: boolean) {
+  return NAV.filter((n) => (isManager || !n.managerOnly) && (isRestaurant || !n.restaurantOnly));
+}
+
+export function SideNav({ isManager, isRestaurant }: { isManager: boolean; isRestaurant: boolean }) {
   const path = usePathname(); // the current address, e.g. "/menu"
 
   return (
@@ -31,10 +38,11 @@ export function SideNav({ isManager }: { isManager: boolean }) {
       <Link href="/" className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-lg font-bold text-white">
         K
       </Link>
+      
 
       {/* LINKS: gap-1.5 = space between buttons */}
       <nav className="flex flex-col gap-1.5">
-        {NAV.filter((n) => isManager || !n.managerOnly).map(({ href, label, icon: Icon }) => {
+        {visibleNav(isManager, isRestaurant).map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? path === "/" : path.startsWith(href); // true for the page you are on
           return (
             // ONE BUTTON (icon on top, label under it)

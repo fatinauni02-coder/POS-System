@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 export const getBusiness = cache(async () => {
   const { data } = await supabase
     .from("businesses")
-    .select("id, name, tagline, sst_registered, sst_rate, address, phone, sst_reg_no, receipt_footer")
+    .select("id, name, tagline, sst_registered, sst_rate, address, phone, sst_reg_no, receipt_footer, service_mode")
     .eq("slug", "kopi-co")
     .single();
   return data;

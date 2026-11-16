@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { getBusiness } from "@/lib/business";
+import { Toast } from "@/components/toast";
 import { hasManagerPin } from "@/lib/pin";
 import { changePin, saveSettings } from "./actions";
 
@@ -31,8 +32,8 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
           <p className="text-sm text-ink-2">Shop details, tax and receipt</p>
         </div>
 
-        {params.saved && <p className="rounded-xl bg-green-50 p-3 font-semibold text-green-800">Saved ✓</p>}
-        {typeof params.error === "string" && <p className="rounded-xl bg-red-50 p-3 font-semibold text-red-700">{params.error}</p>}
+        {params.saved && <Toast key={String(params.t)} kind="msg" text="Saved ✓" />}
+        {typeof params.error === "string" && <Toast key={String(params.t)} kind="error" text={params.error} />}
 
         <Section title="Shop">
           <Field label="Shop name">
@@ -65,6 +66,23 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
           </div>
         </Section>
 
+        <Section title="Service style">
+          <label className="flex items-start gap-3">
+            <input type="radio" name="service_mode" value="cafe" defaultChecked={business.service_mode !== "restaurant"} className="mt-1 h-5 w-5 accent-primary" />
+            <span>
+              <span className="font-semibold">Cafe</span>
+              <span className="block text-sm text-ink-2">Order and pay at the counter</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3">
+            <input type="radio" name="service_mode" value="restaurant" defaultChecked={business.service_mode === "restaurant"} className="mt-1 h-5 w-5 accent-primary" />
+            <span>
+              <span className="font-semibold">Restaurant</span>
+              <span className="block text-sm text-ink-2">Tables: send orders to the kitchen in rounds, pay the bill at the end</span>
+            </span>
+          </label>
+        </Section>
+
         <Section title="Receipt">
           <Field label="Message at the bottom">
             <textarea name="receipt_footer" defaultValue={business.receipt_footer ?? ""} rows={2} maxLength={200} className={`${INPUT} h-auto py-3`} />
@@ -80,10 +98,8 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
           <p className="text-sm text-ink-2">
             {hasPin ? "Needed for refunds. Enter the current PIN to change it." : "No PIN yet — set one here."}
           </p>
-          {params.pin === "changed" && <p className="rounded-xl bg-green-50 p-3 font-semibold text-green-800">PIN changed ✓</p>}
-          {typeof params.pinError === "string" && (
-            <p className="rounded-xl bg-red-50 p-3 font-semibold text-red-700">{params.pinError}</p>
-          )}
+          {params.pin === "changed" && <Toast key={String(params.t)} kind="msg" text="PIN changed ✓" />}
+          {typeof params.pinError === "string" && <Toast key={String(params.t)} kind="error" text={params.pinError} />}
 
           <div className="grid grid-cols-3 gap-3">
             {hasPin && (

@@ -6,6 +6,7 @@ import { DISCOUNTS } from "@/lib/money";
 import { checkManagerPin } from "@/lib/pin";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getStaff } from "@/lib/staff"
+import { refresh } from "next/cache";
 
 // What the browser sends: only WHAT was ordered — no prices.
 // The database looks up the real prices itself, so nobody can change a price in DevTools.
@@ -35,6 +36,11 @@ const MESSAGES: Record<string, string> = {
     NOT_ENOUGH_CASH: "Cash received is less than the amount to pay.",
     TOTAL_CHANGED: "Prices changed on the Menu. Refresh the page and check the total.",
     OUT_OF_STOCK: "Not enough stock for this order.",
+    TABLE_NOT_FOUND: "This table was removed. Go back to Tables.",
+    NOT_OPEN: "This bill was already paid or closed. Go back to Tables.",
+    EMPTY_BILL: "There is nothing to pay on this bill.",
+    LINE_NOT_FOUND: "That item is no longer on the bill.",
+    ALREADY_VOIDED: "That item was already voided.",
 };
 
 export async function placeOrder(input: OrderInput): Promise<OrderResult> {
@@ -78,6 +84,103 @@ export async function placeOrder(input: OrderInput): Promise<OrderResult> {
 }
 
 
+
+// ---------- restaurant mode: send a round to the kitchen ----------
+
+export type SendResult = { ok: true; orderId: number; orderNo: number; round: number } | { ok: false; message: string };
+
+// The cart becomes the next round on the table's bill (migration 010, send_round):
+// first send opens the bill; stock is taken now; payment comes later with "Pay bill".
+export async function sendRound(input: { table: string; lines: OrderInput["lines"] }): Promise<SendResult> {
+    const business = await getBusiness();
+    if (!business) return { ok: false, message: "Shop not found" };
+    const staff = await getStaff();
+    if (!staff) return { ok: false, message: "Please sign in again." };
+
+    const { data, error } = await supabaseAdmin.rpc("send_round", {
+        p_business_id: business.id,
+        p_table: input.table.trim().slice(0, 20),
+        p_lines: input.lines.map((l) => ({ item_id: l.itemId, qty: l.qty, option_ids: l.optionIds, note: l.note.trim().slice(0, 60) })),
+    });
+
+    if (error) {
+        console.error("send_round failed:", error);
+        return { ok: false, message: MESSAGES[error.message] ?? "Couldn't send the order. Please try again." };
+    }
+    return { ok: true, orderId: data.order_id, orderNo: data.order_no, round: data.round };
+}
+
+// ---------- restaurant mode: pay the whole table bill ----------
+
+export type PayBillInput = Omit<OrderInput, "lines" | "orderType" | "table"> & { orderId: number };
+
+// Totals every round on the bill (voided lines left out), discount / SST / cash rounding,
+// takes the payment and closes the bill (migration 010, pay_bill). The table is free again after.
+export async function payBill(input: PayBillInput): Promise<OrderResult> {
+    const business = await getBusiness();
+    if (!business) return { ok: false, message: "Shop not found" };
+    const staff = await getStaff();
+    if (!staff) return { ok: false, message: "Please sign in again." };
+
+    // same rule as placeOrder: a discount only counts with a real approval slip
+    if (input.discountPct > 0 && !isApproved(input.discountToken, `discount:${business.id}:${input.discountPct}`)) {
+        return { ok: false, message: "the discount needs the manager PIN again. Remove it and add it again." };
+    }
+
+    const { data, error } = await supabaseAdmin.rpc("pay_bill", {
+        p_business_id: business.id,
+        p_order_id: String(input.orderId),
+        p_pay: {
+            method: input.method,
+            tendered: input.tendered,
+            expected_payable: input.expectedPayable,
+            discount_pct: input.discountPct,
+        },
+    });
+
+    if (error) {
+        console.error("pay_bill failed:", error);
+        return { ok: false, message: MESSAGES[error.message] ?? "Couldn't take the payment. Please try again." };
+    }
+    // the cashier = whoever took the payment
+    await supabaseAdmin
+        .from("orders")
+        .update({ staff_id: staff.id, cashier: staff.name })
+        .eq("business_id", business.id)
+        .eq("id", data.order_id);
+    return { ok: true, orderId: data.order_id, orderNo: data.order_no, change: data.change };
+}
+
+// ---------- restaurant mode: void one sent line (manager PIN) ----------
+
+// returns an error message, or null if it worked
+export async function voidLine(lineId: number, pin: string, restock: boolean): Promise<string | null> {
+    if (!/^\d{4,6}$/.test(pin)) return "The PIN is 4 to 6 digits.";
+
+    const business = await getBusiness();
+    if (!business) return "Shop not found.";
+    const staff = await getStaff();
+    if (!staff) return "Please sign in again.";
+
+    // checked HERE on the server — the browser can't skip it
+    const pinError = await checkManagerPin(business.id, pin);
+    if (pinError) return pinError;
+
+    // migration 010: marks the line voided, puts its stock back (if asked), updates the bill;
+    // if nothing is left on the bill, the bill closes and the table is free
+    const { error } = await supabaseAdmin.rpc("void_line", {
+        p_business_id: business.id,
+        p_line_id: String(lineId),
+        p_restock: restock,
+    });
+    if (error) {
+        console.error("void_line failed:", error);
+        return MESSAGES[error.message] ?? "Couldn't void the item. Please try again.";
+    }
+
+    refresh(); // redraw the table screen with the new bill
+    return null;
+}
 
 // ---------- discount ----------
 

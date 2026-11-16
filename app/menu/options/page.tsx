@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { getBusiness } from "@/lib/business";
 import { formatRM, toSen } from "@/lib/money";
+import { Toast } from "@/components/toast";
 import { supabase } from "@/lib/supabase";
 import { addGroup, addOption, deleteGroup, removeOption, toggleRequired } from "./actions";
 
@@ -41,8 +42,8 @@ async function Options({ searchParams }: { searchParams: PageProps<"/menu/option
         <p className="text-sm text-ink-2">Choices a customer makes, like Temperature (Hot / Iced) or Milk (Fresh / Oat +RM 2.00)</p>
       </div>
 
-      {typeof params.msg === "string" && <p className="rounded-xl bg-green-50 p-3 font-semibold text-green-800">{params.msg}</p>}
-      {typeof params.error === "string" && <p className="rounded-xl bg-red-50 p-3 font-semibold text-red-700">{params.error}</p>}
+      {typeof params.msg === "string" && <Toast key={String(params.t)} kind="msg" text={params.msg} />}
+      {typeof params.error === "string" && <Toast key={String(params.t)} kind="error" text={params.error} />}
 
       {/* NEW GROUP */}
       <form action={addGroup} className="flex flex-wrap items-end gap-3 rounded-2xl border border-line bg-surface p-4">

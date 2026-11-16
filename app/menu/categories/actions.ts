@@ -9,7 +9,7 @@ const PAGE = "/menu/categories";
 
 // a mistake the user can fix → back to the page with a message (instead of an error screen)
 function fail(message: string): never {
-    redirect(`${PAGE}?error=${encodeURIComponent(message)}`);
+    redirect(`${PAGE}?error=${encodeURIComponent(message)}&t=${Date.now()}`);
 }
 
 // small helpers shared by the 3 actions below

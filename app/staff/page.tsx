@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { getBusiness } from "@/lib/business";
+import { Toast } from "@/components/toast";
 import { TZ } from "@/lib/dates";
 import { getStaff, type Role } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -72,8 +73,8 @@ async function Staff({ searchParams }: { searchParams: PageProps<"/staff">["sear
             </div>
 
             {/* MESSAGES from the last action */}
-            {errorMessage && <p className="rounded-2xl bg-red-50 p-4 font-semibold text-red-700">{errorMessage}</p>}
-            {savedMessage && <p className="rounded-2xl bg-green-50 p-4 font-semibold text-green-800">{savedMessage}</p>}
+            {errorMessage && <Toast key={String(params.t)} kind="error" text={errorMessage} />}
+            {savedMessage && <Toast key={String(params.t)} kind="msg" text={savedMessage} />}
 
             {/* ADD SOMEONE */}
             <form action={addStaff} className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5">

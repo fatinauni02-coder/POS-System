@@ -32,6 +32,7 @@ async function History({ searchParams }: { searchParams: PageProps<"/history">["
     .from("orders")
     .select("id, order_no, created_at, payment_method, total, status, order_items(quantity)")
     .eq("business_id", business.id)
+    .in("status", ["completed", "refunded"]) // open table bills and fully voided bills aren't sales
     .gte("created_at", `${day}T00:00:00+08:00`)
     .lt("created_at", `${addDays(day, 1)}T00:00:00+08:00`)
     .order("created_at", { ascending: false }); // newest first

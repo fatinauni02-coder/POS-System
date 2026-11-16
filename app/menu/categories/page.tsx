@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { getBusiness } from "@/lib/business";
+import { Toast } from "@/components/toast";
 import { supabase } from "@/lib/supabase";
 import { addCategory, deleteCategory, updateCategory } from "./actions";
 
@@ -44,7 +45,7 @@ async function Categories({ searchParams }: { searchParams: PageProps<"/menu/cat
             </div>
 
             {/* ERROR MESSAGE from the last save (e.g. name already exists) */}
-            {errorMessage && <p className="rounded-2xl bg-red-50 p-4 font-semibold text-red-700">{errorMessage}</p>}
+            {errorMessage && <Toast key={String(params.t)} kind="error" text={errorMessage} />}
 
             {/* ADD A CATEGORY */}
             <form action={addCategory} className="flex gap-2 rounded-2xl border border-line bg-surface p-4">
