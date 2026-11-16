@@ -1,16 +1,21 @@
 import { BottomNav } from "@/app/bottom-nav";
+import { getBusiness } from "@/lib/business";
 import { getStaff } from "@/lib/staff";
 import { SideNav } from "./side-nav";
 
-async function isManager() {
-    const staff = await getStaff();
-    return staff !== null && staff.role !== "staff";
+// who's signed in + the shop's mode → which links to show
+async function navInfo() {
+    const [staff, business] = await Promise.all([getStaff(), getBusiness()]);
+    return {
+        isManager: staff !== null && staff.role !== "staff",
+        isRestaurant: business?.service_mode === "restaurant",
+    };
 }
 
 export async function SideNavForStaff() {
-    return <SideNav isManager={await isManager()} />;
+    return <SideNav {...await navInfo()} />;
 }
 
 export async function BottomNavForStaff() {
-    return <BottomNav isManager={await isManager()} />;
+    return <BottomNav {...await navInfo()} />;
 }

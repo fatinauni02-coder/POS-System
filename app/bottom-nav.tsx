@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV } from "@/components/side-nav";
+import { visibleNav } from "@/components/side-nav";
 
-export function BottomNav({ isManager }: {isManager: boolean}) {
+export function BottomNav({ isManager, isRestaurant }: { isManager: boolean; isRestaurant: boolean }) {
   const pathname = usePathname();
 
   return (
     <nav className="flex shrink-0 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
-      {NAV.filter((n) => isManager || !n.managerOnly).map(({ href, label, icon: Icon }) => {
+      {visibleNav(isManager, isRestaurant).map(({ href, label, icon: Icon }) => {
         const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
         return (
           <Link
