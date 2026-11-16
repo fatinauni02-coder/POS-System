@@ -7,6 +7,7 @@ import { CheckoutPanel, type Method } from "./checkout-panel";
 import { payBill, placeOrder, sendRound } from "./actions";
 import Link from "next/link";
 import { DiscountPanel } from "./discount-panel";
+import { VoidLineButton } from "./void-line-button";
 import { useRouter } from "next/navigation";
 
 // ---------- TYPES: the shape of the data this screen gets from page.tsx ----------
@@ -437,7 +438,11 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                                                 {l.qty} x {l.name}
                                                 {l.options.length > 0 && <span className="text-ink-2"> · {l.options.join(", ")}</span>}
                                             </span>
-                                            <span className="shrink-0">{formatRM(l.lineSen)}</span>
+                                            <span className="flex shrink-0 items-baseline">
+                                                {formatRM(l.lineSen)}
+                                                {/* cancel a sent item (manager PIN); already voided → crossed out, no button */}
+                                                {!l.voided && <VoidLineButton lineId={l.id} label={`${l.qty} x ${l.name}`} />}
+                                            </span>
                                         </div>
                                     ))}
                                 </div>

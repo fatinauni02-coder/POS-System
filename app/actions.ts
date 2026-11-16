@@ -6,6 +6,7 @@ import { DISCOUNTS } from "@/lib/money";
 import { checkManagerPin } from "@/lib/pin";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getStaff } from "@/lib/staff"
+import { refresh } from "next/cache";
 
 // What the browser sends: only WHAT was ordered — no prices.
 // The database looks up the real prices itself, so nobody can change a price in DevTools.
@@ -38,6 +39,8 @@ const MESSAGES: Record<string, string> = {
     TABLE_NOT_FOUND: "This table was removed. Go back to Tables.",
     NOT_OPEN: "This bill was already paid or closed. Go back to Tables.",
     EMPTY_BILL: "There is nothing to pay on this bill.",
+    LINE_NOT_FOUND: "That item is no longer on the bill.",
+    ALREADY_VOIDED: "That item was already voided.",
 };
 
 export async function placeOrder(input: OrderInput): Promise<OrderResult> {
@@ -146,6 +149,37 @@ export async function payBill(input: PayBillInput): Promise<OrderResult> {
         .eq("business_id", business.id)
         .eq("id", data.order_id);
     return { ok: true, orderId: data.order_id, orderNo: data.order_no, change: data.change };
+}
+
+// ---------- restaurant mode: void one sent line (manager PIN) ----------
+
+// returns an error message, or null if it worked
+export async function voidLine(lineId: number, pin: string, restock: boolean): Promise<string | null> {
+    if (!/^\d{4,6}$/.test(pin)) return "The PIN is 4 to 6 digits.";
+
+    const business = await getBusiness();
+    if (!business) return "Shop not found.";
+    const staff = await getStaff();
+    if (!staff) return "Please sign in again.";
+
+    // checked HERE on the server — the browser can't skip it
+    const pinError = await checkManagerPin(business.id, pin);
+    if (pinError) return pinError;
+
+    // migration 010: marks the line voided, puts its stock back (if asked), updates the bill;
+    // if nothing is left on the bill, the bill closes and the table is free
+    const { error } = await supabaseAdmin.rpc("void_line", {
+        p_business_id: business.id,
+        p_line_id: String(lineId),
+        p_restock: restock,
+    });
+    if (error) {
+        console.error("void_line failed:", error);
+        return MESSAGES[error.message] ?? "Couldn't void the item. Please try again.";
+    }
+
+    refresh(); // redraw the table screen with the new bill
+    return null;
 }
 
 // ---------- discount ----------
