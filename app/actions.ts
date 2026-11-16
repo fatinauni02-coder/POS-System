@@ -36,6 +36,8 @@ const MESSAGES: Record<string, string> = {
     TOTAL_CHANGED: "Prices changed on the Menu. Refresh the page and check the total.",
     OUT_OF_STOCK: "Not enough stock for this order.",
     TABLE_NOT_FOUND: "This table was removed. Go back to Tables.",
+    NOT_OPEN: "This bill was already paid or closed. Go back to Tables.",
+    EMPTY_BILL: "There is nothing to pay on this bill.",
 };
 
 export async function placeOrder(input: OrderInput): Promise<OrderResult> {
@@ -103,6 +105,47 @@ export async function sendRound(input: { table: string; lines: OrderInput["lines
         return { ok: false, message: MESSAGES[error.message] ?? "Couldn't send the order. Please try again." };
     }
     return { ok: true, orderId: data.order_id, orderNo: data.order_no, round: data.round };
+}
+
+// ---------- restaurant mode: pay the whole table bill ----------
+
+export type PayBillInput = Omit<OrderInput, "lines" | "orderType" | "table"> & { orderId: number };
+
+// Totals every round on the bill (voided lines left out), discount / SST / cash rounding,
+// takes the payment and closes the bill (migration 010, pay_bill). The table is free again after.
+export async function payBill(input: PayBillInput): Promise<OrderResult> {
+    const business = await getBusiness();
+    if (!business) return { ok: false, message: "Shop not found" };
+    const staff = await getStaff();
+    if (!staff) return { ok: false, message: "Please sign in again." };
+
+    // same rule as placeOrder: a discount only counts with a real approval slip
+    if (input.discountPct > 0 && !isApproved(input.discountToken, `discount:${business.id}:${input.discountPct}`)) {
+        return { ok: false, message: "the discount needs the manager PIN again. Remove it and add it again." };
+    }
+
+    const { data, error } = await supabaseAdmin.rpc("pay_bill", {
+        p_business_id: business.id,
+        p_order_id: String(input.orderId),
+        p_pay: {
+            method: input.method,
+            tendered: input.tendered,
+            expected_payable: input.expectedPayable,
+            discount_pct: input.discountPct,
+        },
+    });
+
+    if (error) {
+        console.error("pay_bill failed:", error);
+        return { ok: false, message: MESSAGES[error.message] ?? "Couldn't take the payment. Please try again." };
+    }
+    // the cashier = whoever took the payment
+    await supabaseAdmin
+        .from("orders")
+        .update({ staff_id: staff.id, cashier: staff.name })
+        .eq("business_id", business.id)
+        .eq("id", data.order_id);
+    return { ok: true, orderId: data.order_id, orderNo: data.order_no, change: data.change };
 }
 
 // ---------- discount ----------

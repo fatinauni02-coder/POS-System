@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { OptionPicker } from "./option-picker";
 import { formatRM, toSen } from "@/lib/money";
 import { CheckoutPanel, type Method } from "./checkout-panel";
-import { placeOrder, sendRound } from "./actions";
+import { payBill, placeOrder, sendRound } from "./actions";
 import Link from "next/link";
 import { DiscountPanel } from "./discount-panel";
 import { useRouter } from "next/navigation";
@@ -223,6 +223,27 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
         router.push(`/receipt/${result.orderId}?round=${result.round}`); // the Drinks / Kitchen tickets for this round
     }
 
+    // RESTAURANT MODE: pay the whole table bill (all rounds) — called by the payment pop-up
+    async function payTableBill(method: Method, tendered: number, payable: number) {
+        if (!tableInfo?.bill) return "Nothing to pay on this table.";
+        const result = await payBill({
+            orderId: tableInfo.bill.id,
+            method,
+            tendered,
+            expectedPayable: payable,
+            discountPct: discount?.pct ?? 0,
+            discountToken: discount?.token ?? null,
+        });
+        if (!result.ok) return result.message;
+
+        setDiscount(null);
+        setPaying(false);
+        setShowCart(false);
+        setDone({ orderId: result.orderId, orderNo: result.orderNo, change: result.change });
+        router.refresh(); // the table is free now → the screen reloads without the bill
+        return null;
+    }
+
     // already-sent lines grouped by round: [[1, lines], [2, lines]…]
     const rounds = new Map<number, SentLine[]>();
     for (const l of tableInfo?.bill?.lines ?? []) rounds.set(l.round, [...(rounds.get(l.round) ?? []), l]);
@@ -233,6 +254,12 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
     const discountSen = discount ? Math.round((subtotal * discount.pct) / 100) : 0;
     const sst = Math.round(((subtotal - discountSen) * sstRate) / 100); // 6% = 0.06, but we store it as 6, so divide by 100
     const total = subtotal - discountSen + sst;
+
+    // RESTAURANT MODE: the table bill (everything sent, voided lines already left out by the server)
+    const billSub = tableInfo?.bill?.subtotalSen ?? 0;
+    const billDiscount = discount ? Math.round((billSub * discount.pct) / 100) : 0;
+    const billSst = Math.round(((billSub - billDiscount) * sstRate) / 100);
+    const billTotal = billSub - billDiscount + billSst;
 
 
     // SCREEN SHAPE:
@@ -479,22 +506,64 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                     ))}
                 </div>
 
-                {/* RESTAURANT MODE BOTTOM: new round total + Clear | Send to kitchen (payment comes with "Pay bill") */}
+                {/* RESTAURANT MODE BOTTOM:
+                    items in the cart → New round + Clear | Send to kitchen
+                    cart empty + a bill → the bill (discount, SST, total) + Pay bill
+                    (a new round has to be sent or cleared before paying, so nothing gets forgotten) */}
                 {tableInfo ? (
                     <div className="border-t border-line p-5">
-                        <div className="flex justify-between text-ink-2">
-                            <span>New round</span>
-                            <span>{formatRM(subtotal)}</span>
-                        </div>
-                        {sendError && <p className="mt-2 rounded-xl bg-red-50 p-2 text-sm font-semibold text-red-700">{sendError}</p>}
-                        <div className="mt-4 grid grid-cols-[1fr_2fr] gap-2">
-                            <button onClick={() => setCart([])} disabled={cart.length === 0 || sending} className="h-14 rounded-2xl bg-tint font-semibold disabled:opacity-40">
-                                Clear
-                            </button>
-                            <button onClick={sendToKitchen} disabled={cart.length === 0 || sending} className="h-14 rounded-2xl bg-primary font-bold text-white disabled:opacity-40">
-                                {sending ? "Sending…" : `Send to kitchen (${count})`}
-                            </button>
-                        </div>
+                        {cart.length > 0 || !tableInfo.bill ? (
+                            <>
+                                <div className="flex justify-between text-ink-2">
+                                    <span>New round</span>
+                                    <span>{formatRM(subtotal)}</span>
+                                </div>
+                                {sendError && <p className="mt-2 rounded-xl bg-red-50 p-2 text-sm font-semibold text-red-700">{sendError}</p>}
+                                <div className="mt-4 grid grid-cols-[1fr_2fr] gap-2">
+                                    <button onClick={() => setCart([])} disabled={cart.length === 0 || sending} className="h-14 rounded-2xl bg-tint font-semibold disabled:opacity-40">
+                                        Clear
+                                    </button>
+                                    <button onClick={sendToKitchen} disabled={cart.length === 0 || sending} className="h-14 rounded-2xl bg-primary font-bold text-white disabled:opacity-40">
+                                        {sending ? "Sending…" : `Send to kitchen (${count})`}
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="flex justify-between text-ink-2">
+                                    <span>Bill subtotal</span>
+                                    <span>{formatRM(billSub)}</span>
+                                </div>
+                                {discount ? (
+                                    <div className="flex items-center justify-between text-green-700">
+                                        <span>
+                                            Discount {discount.pct}%{" "}
+                                            <button onClick={() => setDiscount(null)} className="ml-1 text-sm text-red-700 underline">
+                                                remove
+                                            </button>
+                                        </span>
+                                        <span>−{formatRM(billDiscount)}</span>
+                                    </div>
+                                ) : (
+                                    <button onClick={() => setAskDiscount(true)} className="text-sm font-semibold text-primary underline">
+                                        + Add discount
+                                    </button>
+                                )}
+                                {sstRate > 0 && (
+                                    <div className="flex justify-between text-ink-2">
+                                        <span>SST ({sstRate}%)</span>
+                                        <span>{formatRM(billSst)}</span>
+                                    </div>
+                                )}
+                                <div className="mt-2 flex justify-between text-xl font-bold">
+                                    <span>Total</span>
+                                    <span className="text-primary">{formatRM(billTotal)}</span>
+                                </div>
+                                <button onClick={() => setPaying(true)} className="mt-4 h-14 w-full rounded-2xl bg-primary font-bold text-white">
+                                    Pay bill {formatRM(billTotal)}
+                                </button>
+                            </>
+                        )}
                     </div>
                 ) : (
                 // TOTALS + BUTTONS (always at the bottom; border-t = line above)
@@ -567,8 +636,8 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
             {/* the payment pop-up, only after Charge is tapped */}
             {paying && (
                 <CheckoutPanel
-                    total={total}
-                    onPay={pay}
+                    total={tableInfo ? billTotal : total}
+                    onPay={tableInfo ? payTableBill : pay}
                     onClose={() => setPaying(false)}
                 />
             )}
@@ -637,9 +706,16 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                             <Link href={`/receipt/${done.orderId}`} className="flex h-14 items-center justify-center rounded-2xl bg-tint font-semibold">
                                 Receipt
                             </Link>
-                            <button onClick={() => setDone(null)} className="h-14 rounded-2xl bg-primary font-bold text-white">
-                                Next customer
-                            </button>
+                            {tableInfo ? (
+                                // restaurant mode: the table is free again → back to the tables
+                                <Link href="/tables" className="flex h-14 items-center justify-center rounded-2xl bg-primary font-bold text-white">
+                                    Back to Tables
+                                </Link>
+                            ) : (
+                                <button onClick={() => setDone(null)} className="h-14 rounded-2xl bg-primary font-bold text-white">
+                                    Next customer
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
