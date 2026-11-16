@@ -1,22 +1,41 @@
+import Link from "next/link";
 import { Suspense } from "react";
 
 import { getBusiness } from "@/lib/business";
+import { toSen } from "@/lib/money";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { OrderScreenClient } from "./order-screen-client";
+import type { TableInfo } from "./order-screen";
 
 // "/" = the Order screen (the till)
-export default function OrderPage() {
+// "/?table=5" = restaurant mode: ordering for table 5 (the cart becomes the next round)
+export default function OrderPage({ searchParams }: PageProps<"/">) {
   return (
     <Suspense fallback={<p className="p-6">Loading…</p>}>
-      <OrderContent />
+      <OrderContent searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function OrderContent() {
+async function OrderContent({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
   const business = await getBusiness();
   if (!business) return <p className="p-6 text-red-600">Shop not found</p>;
+
+  // RESTAURANT MODE: which table (only when the shop is in restaurant mode)
+  const { table } = await searchParams;
+  const tableLabel = business.service_mode === "restaurant" && typeof table === "string" && table.trim() ? table.trim() : null;
+  let tableInfo: TableInfo | null = null;
+  if (tableLabel) {
+    tableInfo = await loadTable(business.id, tableLabel);
+    if (!tableInfo) {
+      return (
+        <p className="p-6">
+          Table {tableLabel} not found. <Link href="/tables" className="font-semibold text-primary underline">Back to Tables</Link>
+        </p>
+      );
+    }
+  }
 
   // SPEED: ask Supabase all 6 questions AT THE SAME TIME (Promise.all) instead of one after another.
   // Each question is a trip to the database; 6 trips in a row were the main reason this page was slow.
@@ -61,5 +80,71 @@ async function OrderContent() {
   const itemsWithLeft = (items ?? []).map((i) => ({ ...i, left: leftFor(i.id) }));
   const sstRate = business.sst_registered ? Number(business.sst_rate) : 0;
 
-  return <OrderScreenClient categories={categories ?? []} items={itemsWithLeft} groups={groups ?? []} sstRate={sstRate} tables={(tables ??[]).map((t) => t.label)} />;
+  // key = a fresh screen (and its own saved cart) for each table, and for the counter
+  return (
+    <OrderScreenClient
+      key={tableLabel ?? "counter"}
+      categories={categories ?? []}
+      items={itemsWithLeft}
+      groups={groups ?? []}
+      sstRate={sstRate}
+      tables={(tables ?? []).map((t) => t.label)}
+      tableInfo={tableInfo}
+    />
+  );
+}
+
+// one line already sent to the kitchen, as saved by send_round (migration 010)
+type SentRow = {
+  id: number;
+  item_name: string;
+  quantity: number;
+  line_total: number | string;
+  options: { name: string }[];
+  notes: string | null;
+  round: number;
+  voided: boolean;
+};
+
+// the table + its open bill (null = no such table)
+async function loadTable(businessId: string, label: string): Promise<TableInfo | null> {
+  const { data: tab } = await supabase
+    .from("dining_tables")
+    .select("id, label")
+    .eq("business_id", businessId)
+    .eq("label", label)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (!tab) return null;
+
+  // bills are private (RLS) → secret key; lines in the order they were sent
+  const { data: bill } = await supabaseAdmin
+    .from("orders")
+    .select("id, order_no, subtotal, order_items(id, item_name, quantity, line_total, options, notes, round, voided)")
+    .eq("business_id", businessId)
+    .eq("table_id", tab.id)
+    .eq("status", "open")
+    .order("id", { referencedTable: "order_items" })
+    .maybeSingle();
+
+  return {
+    label: tab.label,
+    bill: bill
+      ? {
+          id: bill.id,
+          orderNo: bill.order_no,
+          subtotalSen: toSen(bill.subtotal),
+          lines: (bill.order_items as SentRow[]).map((l) => ({
+            id: l.id,
+            name: l.item_name,
+            qty: l.quantity,
+            lineSen: toSen(l.line_total),
+            options: l.options.map((o) => o.name),
+            note: l.notes,
+            round: l.round,
+            voided: l.voided,
+          })),
+        }
+      : null,
+  };
 }

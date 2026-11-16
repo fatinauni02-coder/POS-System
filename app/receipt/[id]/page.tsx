@@ -29,6 +29,9 @@ type Line = {
     options: { name: string; group?: string; price_sen?: number }[];
     notes: string | null;
     station: string | null;
+    round: number; // restaurant mode: 1 = first send, 2+ = add-on rounds
+    voided: boolean; // cancelled after it was sent → left off the receipt and tickets
+    sent_at: string;
 };
 
 const METHOD_NAMES: Record<string, string> = { cash: "Cash", card: "Card", duitnow: "DuitNow QR", ewallet: "E-wallet" };
@@ -42,7 +45,10 @@ async function Receipt({
 }) {
     const { id } = await params;
     const query = await searchParams; // NEW
-    const show = query.show === "bar" || query.show === "kitchen" ? query.show : "receipt"; // NEW
+    let show = query.show === "bar" || query.show === "kitchen" ? query.show : "receipt"; // NEW
+    // restaurant mode: "?round=2" = only the tickets of that round (sent as an ADD-ON)
+    const roundNo = Number(query.round);
+    const oneRound = Number.isInteger(roundNo) && roundNo > 0 ? roundNo : null;
 
     const business = await getBusiness();
     if (!business) notFound();
@@ -50,40 +56,46 @@ async function Receipt({
     // orders are private (RLS), so read them with the secret key — this file only runs on the server
     const { data: order } = await supabaseAdmin
         .from("orders")
-        .select("*, order_items(id, item_name, quantity, line_total, options, notes, station)") // NEW: notes, station
+        .select("*, order_items(id, item_name, quantity, line_total, options, notes, station, round, voided, sent_at)")
         .eq("business_id", business.id) // only THIS shop's orders
         .eq("id", id)
+        .order("id", { referencedTable: "order_items" }) // lines in the order they were added
         .maybeSingle();
     if (!order) notFound(); // shows the 404 page
 
     // the server may be in another country: always show Malaysia time
-    const when = new Date(order.created_at).toLocaleString("en-MY", {
-        timeZone: "Asia/Kuala_Lumpur",
-        dateStyle: "medium",
-        timeStyle: "short",
-    });
+    const when = malaysiaTime(order.created_at);
     const rounding = toSen(order.rounding);
     const change = toSen(order.change_due);
     const refunded = order.status === "refunded";
+    const open = order.status === "open"; // a table bill that isn't paid yet: tickets only, no receipt
     const hasPin = await hasManagerPin(business.id);
 
     // NEW: "Dine-in · Table 5" or "Takeaway" — used by the receipt and both tickets
     const place = order.order_type === "dine_in" ? `Dine-in${order.table_label ? ` · Table ${order.table_label}` : ""}` : "Takeaway";
 
     // NEW: split the lines by station (old orders without a station count as kitchen)
-    const lines: Line[] = order.order_items;
-    const bar = lines.filter((l) => l.station === "bar");
-    const kitchen = lines.filter((l) => l.station !== "bar");
+    const lines = (order.order_items as Line[]).filter((l) => !l.voided);
+    const ticketLines = oneRound ? lines.filter((l) => l.round === oneRound) : lines;
+    const bar = ticketLines.filter((l) => l.station === "bar");
+    const kitchen = ticketLines.filter((l) => l.station !== "bar");
     const count = (list: Line[]) => list.reduce((n, l) => n + l.quantity, 0);
+
+    // an open bill has no receipt yet → start on a ticket
+    if (open && show === "receipt") show = bar.length > 0 ? "bar" : "kitchen";
+    // a round's ticket shows when THAT round was sent
+    const ticketWhen = oneRound && ticketLines[0] ? malaysiaTime(ticketLines[0].sent_at) : when;
+    const roundQ = oneRound ? `&round=${oneRound}` : ""; // keep "?round=…" when switching tabs
+    const addOn = oneRound !== null && oneRound > 1 ? " · ADD-ON" : "";
 
     return (
         <div className="flex flex-col items-center gap-4 p-6 print:p-0">
             {/* NEW: TABS — only for stations that have items in this order */}
             <div className="flex w-[72mm] gap-1 rounded-2xl bg-tint p-1 print:hidden">
-                <Tab href={`/receipt/${id}`} label="Receipt" active={show === "receipt"} />
-                {bar.length > 0 && <Tab href={`/receipt/${id}?show=bar`} label={`Drinks (${count(bar)})`} active={show === "bar"} />}
+                {!open && <Tab href={`/receipt/${id}`} label="Receipt" active={show === "receipt"} />}
+                {bar.length > 0 && <Tab href={`/receipt/${id}?show=bar${roundQ}`} label={`Drinks (${count(bar)})`} active={show === "bar"} />}
                 {kitchen.length > 0 && (
-                    <Tab href={`/receipt/${id}?show=kitchen`} label={`Kitchen (${count(kitchen)})`} active={show === "kitchen"} />
+                    <Tab href={`/receipt/${id}?show=kitchen${roundQ}`} label={`Kitchen (${count(kitchen)})`} active={show === "kitchen"} />
                 )}
             </div>
 
@@ -151,10 +163,10 @@ async function Receipt({
             ) : (
                 // NEW: a ticket for the bar or the kitchen
                 <Ticket
-                    title={show === "bar" ? "DRINKS" : "KITCHEN"}
+                    title={(show === "bar" ? "DRINKS" : "KITCHEN") + addOn}
                     orderNo={order.order_no}
                     place={place}
-                    when={when}
+                    when={ticketWhen}
                     lines={show === "bar" ? bar : kitchen}
                     refunded={refunded}
                 />
@@ -162,11 +174,18 @@ async function Receipt({
 
             {/* BUTTONS — print:hidden = not on the paper */}
             <div className="grid w-[72mm] grid-cols-2 gap-2 print:hidden">
-                <Link href="/" className="flex h-12 items-center justify-center rounded-2xl bg-tint font-semibold">
-                    Next customer
-                </Link>
+                {open ? (
+                    // table bill still open: back to the tables (paying comes later with "Pay bill")
+                    <Link href="/tables" className="flex h-12 items-center justify-center rounded-2xl bg-tint font-semibold">
+                        Back to Tables
+                    </Link>
+                ) : (
+                    <Link href="/" className="flex h-12 items-center justify-center rounded-2xl bg-tint font-semibold">
+                        Next customer
+                    </Link>
+                )}
                 <PrintButton label={show === "receipt" ? "Print receipt" : "Print ticket"} />
-                {!refunded && <RefundButton orderId={order.id} hasPin={hasPin} />}
+                {!refunded && !open && <RefundButton orderId={order.id} hasPin={hasPin} />}
             </div>
         </div>
     );
@@ -246,4 +265,9 @@ function Divider() {
 function splitOptions(options: Line["options"]) {
     const temp = options.find((o) => o.group === "Temperature");
     return { temp, addOns: options.filter((o) => o !== temp) };
+}
+
+// the server may be in another country: always show Malaysia time
+function malaysiaTime(iso: string) {
+    return new Date(iso).toLocaleString("en-MY", { timeZone: "Asia/Kuala_Lumpur", dateStyle: "medium", timeStyle: "short" });
 }

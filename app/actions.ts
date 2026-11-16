@@ -35,6 +35,7 @@ const MESSAGES: Record<string, string> = {
     NOT_ENOUGH_CASH: "Cash received is less than the amount to pay.",
     TOTAL_CHANGED: "Prices changed on the Menu. Refresh the page and check the total.",
     OUT_OF_STOCK: "Not enough stock for this order.",
+    TABLE_NOT_FOUND: "This table was removed. Go back to Tables.",
 };
 
 export async function placeOrder(input: OrderInput): Promise<OrderResult> {
@@ -78,6 +79,31 @@ export async function placeOrder(input: OrderInput): Promise<OrderResult> {
 }
 
 
+
+// ---------- restaurant mode: send a round to the kitchen ----------
+
+export type SendResult = { ok: true; orderId: number; orderNo: number; round: number } | { ok: false; message: string };
+
+// The cart becomes the next round on the table's bill (migration 010, send_round):
+// first send opens the bill; stock is taken now; payment comes later with "Pay bill".
+export async function sendRound(input: { table: string; lines: OrderInput["lines"] }): Promise<SendResult> {
+    const business = await getBusiness();
+    if (!business) return { ok: false, message: "Shop not found" };
+    const staff = await getStaff();
+    if (!staff) return { ok: false, message: "Please sign in again." };
+
+    const { data, error } = await supabaseAdmin.rpc("send_round", {
+        p_business_id: business.id,
+        p_table: input.table.trim().slice(0, 20),
+        p_lines: input.lines.map((l) => ({ item_id: l.itemId, qty: l.qty, option_ids: l.optionIds, note: l.note.trim().slice(0, 60) })),
+    });
+
+    if (error) {
+        console.error("send_round failed:", error);
+        return { ok: false, message: MESSAGES[error.message] ?? "Couldn't send the order. Please try again." };
+    }
+    return { ok: true, orderId: data.order_id, orderNo: data.order_no, round: data.round };
+}
 
 // ---------- discount ----------
 

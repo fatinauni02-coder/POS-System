@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { OptionPicker } from "./option-picker";
 import { formatRM, toSen } from "@/lib/money";
 import { CheckoutPanel, type Method } from "./checkout-panel";
-import { placeOrder } from "./actions";
+import { placeOrder, sendRound } from "./actions";
 import Link from "next/link";
 import { DiscountPanel } from "./discount-panel";
 import { useRouter } from "next/navigation";
@@ -22,14 +22,20 @@ export type Group = { id: string; name: string; required: boolean; options: Opti
 // one line in the cart. key = item id + chosen option ids, so "Latte Hot" and "Latte Iced" are 2 lines
 export type CartLine = { key: string; itemId: number; name: string; options: string[]; optionIds: string[]; unitSen: number; qty: number; note?: string };
 
-type Props = { categories: Category[]; items: Item[]; groups: Group[]; sstRate: number; tables: string[] };
+// RESTAURANT MODE: a line already sent to the kitchen (from page.tsx)
+export type SentLine = { id: number; name: string; qty: number; lineSen: number; options: string[]; note: string | null; round: number; voided: boolean };
+// the table we're ordering for, and its open bill (null = nothing sent yet)
+export type TableInfo = { label: string; bill: { id: number; orderNo: number; subtotalSen: number; lines: SentLine[] } | null };
+
+type Props = { categories: Category[]; items: Item[]; groups: Group[]; sstRate: number; tables: string[]; tableInfo: TableInfo | null };
 const CART_KEY = "pos.cart"; // the name the cart is saved under in the browser
 
 // Reads the saved cart from the browser when the screen opens.
 // Anything broken or from an old version → start with an empty cart instead of crashing.
-function loadCart(): CartLine[] {
+// key: the counter uses "pos.cart"; each table has its own, e.g. "pos.cart.table.5"
+function loadCart(key: string): CartLine[] {
     try {
-        const saved = localStorage.getItem(CART_KEY);
+        const saved = localStorage.getItem(key);
         const parsed = saved ? JSON.parse(saved) : [];
         return Array.isArray(parsed) ? parsed.filter((l) => l.key && Array.isArray(l.optionIds)) : [];
     } catch {
@@ -50,10 +56,13 @@ function loadHeld(): Held[] {
     }
 }
 
-export function OrderScreen({ categories, items, groups, sstRate, tables }: Props) {
+export function OrderScreen({ categories, items, groups, sstRate, tables, tableInfo }: Props) {
+    // restaurant mode = ordering for a table (cart = next round, "Send to kitchen" instead of "Charge")
+    const cartKey = tableInfo ? `${CART_KEY}.table.${tableInfo.label}` : CART_KEY;
+
     // ---------- STATE (values that change → screen redraws) ----------
     const [activeCat, setActiveCat] = useState(categories[0]?.id ?? "all"); // selected chip; starts on the 1st category
-    const [cart, setCart] = useState<CartLine[]>(loadCart);
+    const [cart, setCart] = useState<CartLine[]>(() => loadCart(cartKey));
     const [picking, setPicking] = useState<Item | null>(null); // item whose pop-up is open
     const [paying, setPaying] = useState(false); // payment pop-up open?
     const [done, setDone] = useState<{ orderId: number; orderNo: number; change: number } | null>(null); // last paid order
@@ -67,11 +76,13 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
     const [held, setHeld] = useState<Held[]>(loadHeld);
     const [showHeld, setShowHeld] = useState(false);
     const needsTable = orderType === "dine_in" && table.trim() === "";
+    const [sending, setSending] = useState(false); // waiting for the server after "Send to kitchen"
+    const [sendError, setSendError] = useState("");
 
     // every time the cart changes, save it in the browser (so F5 doesn't lose it)
     useEffect(() => {
-        localStorage.setItem(CART_KEY, JSON.stringify(cart));
-    }, [cart]);
+        localStorage.setItem(cartKey, JSON.stringify(cart));
+    }, [cart, cartKey]);
 
     useEffect(() => {
         localStorage.setItem(HELD_KEY, JSON.stringify(held));
@@ -194,6 +205,28 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
         return null;
     }
 
+    // RESTAURANT MODE: send the cart to the kitchen as the next round, then show its tickets
+    async function sendToKitchen() {
+        if (!tableInfo || cart.length === 0) return;
+        setSending(true);
+        setSendError("");
+        const result = await sendRound({
+            table: tableInfo.label,
+            lines: cart.map((l) => ({ itemId: l.itemId, qty: l.qty, optionIds: l.optionIds, note: l.note ?? "" })),
+        });
+        setSending(false);
+        if (!result.ok) {
+            setSendError(result.message);
+            return;
+        }
+        setCart([]); // sent → this table's cart is empty again
+        router.push(`/receipt/${result.orderId}?round=${result.round}`); // the Drinks / Kitchen tickets for this round
+    }
+
+    // already-sent lines grouped by round: [[1, lines], [2, lines]…]
+    const rounds = new Map<number, SentLine[]>();
+    for (const l of tableInfo?.bill?.lines ?? []) rounds.set(l.round, [...(rounds.get(l.round) ?? []), l]);
+
     // ---------- TOTALS (all in sen: RM 12.50 = 1250) ----------
     const count = cart.reduce((n, l) => n + l.qty, 0);
     const subtotal = cart.reduce((sum, l) => sum + l.unitSen * l.qty, 0);
@@ -283,8 +316,8 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
                         onClick={() => setShowCart(true)}
                         className="flex h-14 shrink-0 items-center justify-between rounded-2xl bg-primary px-5 font-bold text-white md:hidden"
                     >
-                        <span>View order ({count})</span>
-                        <span>{formatRM(total)}</span>
+                        <span>{tableInfo ? `Table ${tableInfo.label}` : "View order"} ({count})</span>
+                        <span>{formatRM(tableInfo ? subtotal : total)}</span>
                     </button>
                 )}
             </main>
@@ -300,19 +333,32 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
                 <button onClick={() => setShowCart(false)} className="px-5 pt-4 text-left font-semibold text-primary md:hidden">
                     ← Back to menu
                 </button>
-                <h1 className="px-5 pt-5 text-2xl font-bold">
-                    Current order <span className="text-base font-semibold text-ink-2">({count} items)</span>
-                </h1>
+                {tableInfo ? (
+                    // RESTAURANT MODE TITLE: "Table 5" + back to the tables
+                    <div className="flex items-baseline justify-between px-5 pt-5">
+                        <h1 className="text-2xl font-bold">
+                            Table {tableInfo.label}
+                            {tableInfo.bill && <span className="ml-2 text-base font-semibold text-ink-2">#{tableInfo.bill.orderNo}</span>}
+                        </h1>
+                        <Link href="/tables" className="text-sm font-semibold text-primary">
+                            ← Tables
+                        </Link>
+                    </div>
+                ) : (
+                    <h1 className="px-5 pt-5 text-2xl font-bold">
+                        Current order <span className="text-base font-semibold text-ink-2">({count} items)</span>
+                    </h1>
+                )}
 
-                {held.length > 0 && (
+                {!tableInfo && held.length > 0 && (
                     <button onClick={() => setShowHeld(true)} className="mx-5 mt-2 h-10 rounded-xl border border-amber-300 bg-amber-50 font-semibold text-amber-800">
                         Held orders ({held.length})
                     </button>
                 )}
 
 
-                {/* TAKEAWAY / DINE-IN: two buttons side by side (grid-cols-2) */}
-                <div className="mt-3 grid grid-cols-2 gap-2 px-5">
+                {/* TAKEAWAY / DINE-IN: two buttons side by side (grid-cols-2) — not for a table (always dine-in) */}
+                <div className={`mt-3 grid-cols-2 gap-2 px-5 ${tableInfo ? "hidden" : "grid"}`}>
                     {(["takeaway", "dine_in"] as const).map((t) => (
                         <button
                             key={t}
@@ -324,7 +370,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
                     ))}
                 </div>
                 {/* table box only for dine-in; <datalist> = suggestions from the shop's tables, but any text works */}
-                {orderType === "dine_in" && (
+                {!tableInfo && orderType === "dine_in" && (
                     <div className="mt-2 px-5">
                         <input
                             value={table}
@@ -348,7 +394,34 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
                     overflow-y-auto = many lines → only this part scrolls, totals stay visible
                     gap-2 = space between lines; p-5 = inner space */}
                 <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-5">
-                    {cart.length === 0 && <p className="py-10 text-center text-ink-2">Tap an item to start</p>}
+                    {/* RESTAURANT MODE: what this table already has, round by round (read-only) */}
+                    {tableInfo?.bill && (
+                        <div className="rounded-2xl bg-tint p-3">
+                            <div className="flex justify-between text-sm font-bold">
+                                <span>Already sent</span>
+                                <span>{formatRM(tableInfo.bill.subtotalSen)}</span>
+                            </div>
+                            {[...rounds].map(([round, lines]) => (
+                                <div key={round} className="mt-2">
+                                    <p className="text-xs font-bold uppercase text-ink-2">{round === 1 ? "Round 1" : `Round ${round} · add-on`}</p>
+                                    {lines.map((l) => (
+                                        <div key={l.id} className={`flex justify-between gap-2 text-sm ${l.voided ? "text-ink-2 line-through" : ""}`}>
+                                            <span>
+                                                {l.qty} x {l.name}
+                                                {l.options.length > 0 && <span className="text-ink-2"> · {l.options.join(", ")}</span>}
+                                            </span>
+                                            <span className="shrink-0">{formatRM(l.lineSen)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {tableInfo && cart.length > 0 && <p className="mt-1 text-xs font-bold uppercase text-ink-2">New round</p>}
+
+                    {cart.length === 0 && (
+                        <p className="py-10 text-center text-ink-2">{tableInfo ? "Tap items to add a round for this table" : "Tap an item to start"}</p>
+                    )}
 
                     {cart.map((l) => (
                         // ONE LINE (a bordered card): name + price / options / − qty + @unit price
@@ -406,7 +479,25 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
                     ))}
                 </div>
 
-                {/* TOTALS + BUTTONS (always at the bottom; border-t = line above) */}
+                {/* RESTAURANT MODE BOTTOM: new round total + Clear | Send to kitchen (payment comes with "Pay bill") */}
+                {tableInfo ? (
+                    <div className="border-t border-line p-5">
+                        <div className="flex justify-between text-ink-2">
+                            <span>New round</span>
+                            <span>{formatRM(subtotal)}</span>
+                        </div>
+                        {sendError && <p className="mt-2 rounded-xl bg-red-50 p-2 text-sm font-semibold text-red-700">{sendError}</p>}
+                        <div className="mt-4 grid grid-cols-[1fr_2fr] gap-2">
+                            <button onClick={() => setCart([])} disabled={cart.length === 0 || sending} className="h-14 rounded-2xl bg-tint font-semibold disabled:opacity-40">
+                                Clear
+                            </button>
+                            <button onClick={sendToKitchen} disabled={cart.length === 0 || sending} className="h-14 rounded-2xl bg-primary font-bold text-white disabled:opacity-40">
+                                {sending ? "Sending…" : `Send to kitchen (${count})`}
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                // TOTALS + BUTTONS (always at the bottom; border-t = line above)
                 <div className="border-t border-line p-5">
                     {/* each row: label left, amount right (justify-between) */}
                     <div className="flex justify-between text-ink-2">
@@ -458,6 +549,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables }: Prop
                         </button>
                     </div>
                 </div>
+                )}
             </aside>
 
             {/* the pop-up, only while an item is being picked (it covers the whole screen, see option-picker.tsx) */}
