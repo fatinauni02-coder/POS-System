@@ -11,7 +11,7 @@ import { requireManager } from "@/lib/staff";
 function back(kind: "msg" | "error", text: string): never {
   revalidatePath("/menu/options");
   revalidatePath("/"); // the Order screen shows these options too
-  redirect(`/menu/options?${kind}=${encodeURIComponent(text)}`);
+  redirect(`/menu/options?${kind}=${encodeURIComponent(text)}&t=${Date.now()}`);
 }
 
 // Postgres error 23505 = duplicate name

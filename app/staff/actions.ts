@@ -15,12 +15,12 @@ const PAGE = "/staff";
 
 // back to the page with a red message (a mistake the user can fix)
 function fail(message: string): never {
-    redirect(`${PAGE}?error=${encodeURIComponent(message)}`);
+    redirect(`${PAGE}?error=${encodeURIComponent(message)}&t=${Date.now()}`);
 }
 
 // back to the page with a green message
 function done(message: string): never {
-    redirect(`${PAGE}?saved=${encodeURIComponent(message)}`);
+    redirect(`${PAGE}?saved=${encodeURIComponent(message)}&t=${Date.now()}`);
 }
 
 async function shopId() {
