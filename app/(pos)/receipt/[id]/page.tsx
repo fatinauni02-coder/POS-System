@@ -72,7 +72,10 @@ async function Receipt({
     const hasPin = await hasManagerPin(business.id);
 
     // NEW: "Dine-in · Table 5" or "Takeaway" — used by the receipt and both tickets
-    const place = order.order_type === "dine_in" ? `Dine-in${order.table_label ? ` · Table ${order.table_label}` : ""}` : "Takeaway";
+    const place =
+        order.order_type === "dine_in"
+            ? `Dine-in${order.table_label ? ` · Table ${order.table_label}` : ""}`
+            : `Takeaway${order.customer_name ? ` · ${order.customer_name}` : ""}`; // QR takeaway: who to call
 
     // NEW: split the lines by station (old orders without a station count as kitchen)
     const lines = (order.order_items as Line[]).filter((l) => !l.voided);
@@ -176,8 +179,8 @@ async function Receipt({
             <div className="grid w-[72mm] grid-cols-2 gap-2 print:hidden">
                 {open ? (
                     // table bill still open: back to the tables (paying comes later with "Pay bill")
-                    <Link href="/tables" className="flex h-12 items-center justify-center rounded-2xl bg-tint font-semibold">
-                        Back to Tables
+                    <Link href={order.order_type === "takeaway" ? "/qr" : "/tables"} className="flex h-12 items-center justify-center rounded-2xl bg-tint font-semibold">
+                        {order.order_type === "takeaway" ? "Back to QR orders" : "Back to Tables"}
                     </Link>
                 ) : (
                     <Link href="/" className="flex h-12 items-center justify-center rounded-2xl bg-tint font-semibold">

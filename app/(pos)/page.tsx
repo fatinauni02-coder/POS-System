@@ -23,10 +23,14 @@ async function OrderContent({ searchParams }: { searchParams: PageProps<"/">["se
   if (!business) return <p className="p-6 text-red-600">Shop not found</p>;
 
   // RESTAURANT MODE: which table (only when the shop is in restaurant mode)
-  const { table } = await searchParams;
+  // "?bill=123" = an open TAKEAWAY bill (from a QR order), to take the payment
+  const { table, bill } = await searchParams;
   const tableLabel = business.service_mode === "restaurant" && typeof table === "string" && table.trim() ? table.trim() : null;
+  const billId = typeof bill === "string" && /^\d+$/.test(bill) ? Number(bill) : null;
   let tableInfo: TableInfo | null = null;
-  if (tableLabel) {
+  if (billId) {
+    tableInfo = await loadTakeawayBill(business.id, billId);
+  } else if (tableLabel) {
     tableInfo = await loadTable(business.id, tableLabel);
     if (!tableInfo) {
       return (
@@ -83,7 +87,7 @@ async function OrderContent({ searchParams }: { searchParams: PageProps<"/">["se
   // key = a fresh screen (and its own saved cart) for each table, and for the counter
   return (
     <OrderScreenClient
-      key={tableLabel ?? "counter"}
+      key={billId ? `bill-${billId}` : (tableLabel ?? "counter")}
       categories={categories ?? []}
       items={itemsWithLeft}
       groups={groups ?? []}
@@ -120,16 +124,45 @@ async function loadTable(businessId: string, label: string): Promise<TableInfo |
   // bills are private (RLS) → secret key; lines in the order they were sent
   const { data: bill } = await supabaseAdmin
     .from("orders")
-    .select("id, order_no, subtotal, order_items(id, item_name, quantity, line_total, options, notes, round, voided)")
+    .select(BILL_SELECT)
     .eq("business_id", businessId)
     .eq("table_id", tab.id)
     .eq("status", "open")
     .order("id", { referencedTable: "order_items" })
     .maybeSingle();
 
+  return { label: tab.label, bill: toBill(bill) };
+}
+
+// a TAKEAWAY bill opened by an accepted QR order: pay only (no more rounds), then back to the QR board
+async function loadTakeawayBill(businessId: string, orderId: number): Promise<TableInfo> {
+  const { data: bill } = await supabaseAdmin
+    .from("orders")
+    .select(`${BILL_SELECT}, customer_name`)
+    .eq("business_id", businessId)
+    .eq("id", orderId)
+    .eq("order_type", "takeaway")
+    .eq("status", "open")
+    .order("id", { referencedTable: "order_items" })
+    .maybeSingle();
+
   return {
-    label: tab.label,
-    bill: bill
+    label: "",
+    title: bill ? `Takeaway · ${bill.customer_name ?? `#${bill.order_no}`}` : "Takeaway",
+    canAdd: false,
+    backHref: "/qr",
+    backLabel: "QR orders",
+    bill: toBill(bill),
+  };
+}
+
+const BILL_SELECT = "id, order_no, subtotal, order_items(id, item_name, quantity, line_total, options, notes, round, voided)";
+
+type BillRow = { id: number; order_no: number; subtotal: number | string; order_items: unknown };
+
+// database row → what the Order screen needs (null = no open bill)
+function toBill(bill: BillRow | null): TableInfo["bill"] {
+  return bill
       ? {
           id: bill.id,
           orderNo: bill.order_no,
@@ -145,6 +178,5 @@ async function loadTable(businessId: string, label: string): Promise<TableInfo |
             voided: l.voided,
           })),
         }
-      : null,
-  };
+      : null;
 }

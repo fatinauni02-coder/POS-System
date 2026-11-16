@@ -1,6 +1,6 @@
 "use client"; // needs the browser: usePathname reads the current address
 
-import { ChartColumn, Package, ReceiptText, Settings, ShoppingBasket, Users, UtensilsCrossed, LayoutGrid } from "lucide-react";
+import { ChartColumn, Package, ReceiptText, Settings, ShoppingBasket, Users, UtensilsCrossed, LayoutGrid, QrCode } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 export const NAV = [
   { href: "/", label: "Order", icon: ShoppingBasket, managerOnly: false },
   { href: "/tables", label: "Tables", icon: LayoutGrid, managerOnly: false, restaurantOnly: true },
+  { href: "/qr", label: "QR", icon: QrCode, managerOnly: false },
   { href: "/menu", label: "Menu", icon: UtensilsCrossed, managerOnly: true },
   { href: "/stock", label: "Stock", icon: Package, managerOnly: true },
   { href: "/staff", label: "Staff", icon: Users, managerOnly: true },
@@ -23,7 +24,8 @@ export function visibleNav(isManager: boolean, isRestaurant: boolean) {
   return NAV.filter((n) => (isManager || !n.managerOnly) && (isRestaurant || !n.restaurantOnly));
 }
 
-export function SideNav({ isManager, isRestaurant }: { isManager: boolean; isRestaurant: boolean }) {
+// newQr = how many phone orders are waiting → red number on the "QR" button
+export function SideNav({ isManager, isRestaurant, newQr }: { isManager: boolean; isRestaurant: boolean; newQr: number }) {
   const path = usePathname(); // the current address, e.g. "/menu"
 
   return (
@@ -53,16 +55,26 @@ export function SideNav({ isManager, isRestaurant }: { isManager: boolean; isRes
             <Link
               key={href}
               href={href}
-              className={`flex w-[56px] flex-col items-center gap-1 rounded-2xl py-2.5 text-[11px] font-semibold ${active ? "bg-primary-soft text-white" : "text-ink-2 hover:bg-tint"
+              className={`relative flex w-[56px] flex-col items-center gap-1 rounded-2xl py-2.5 text-[11px] font-semibold ${active ? "bg-primary-soft text-white" : "text-ink-2 hover:bg-tint"
                 }`}
             >
               {/* icon size: h-5 w-5 (20px). Try h-6 w-6 for bigger */}
               <Icon className="h-5 w-5" />
               {label}
+              {href === "/qr" && newQr > 0 && <QrBadge count={newQr} />}
             </Link>
           );
         })}
       </nav>
     </aside>
+  );
+}
+
+// small red circle with a number, top-right of a nav button
+export function QrBadge({ count }: { count: number }) {
+  return (
+    <span className="absolute right-1 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">
+      {count}
+    </span>
   );
 }

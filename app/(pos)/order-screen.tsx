@@ -26,7 +26,14 @@ export type CartLine = { key: string; itemId: number; name: string; options: str
 // RESTAURANT MODE: a line already sent to the kitchen (from page.tsx)
 export type SentLine = { id: number; name: string; qty: number; lineSen: number; options: string[]; note: string | null; round: number; voided: boolean };
 // the table we're ordering for, and its open bill (null = nothing sent yet)
-export type TableInfo = { label: string; bill: { id: number; orderNo: number; subtotalSen: number; lines: SentLine[] } | null };
+export type TableInfo = {
+    label: string;
+    bill: { id: number; orderNo: number; subtotalSen: number; lines: SentLine[] } | null;
+    title?: string; // shown instead of "Table 5" (e.g. "Takeaway · Ali")
+    canAdd?: boolean; // false = pay only, no new rounds (takeaway QR bills)
+    backHref?: string; // where "back" goes (default /tables)
+    backLabel?: string;
+};
 
 type Props = { categories: Category[]; items: Item[]; groups: Group[]; sstRate: number; tables: string[]; tableInfo: TableInfo | null };
 const CART_KEY = "pos.cart"; // the name the cart is saved under in the browser
@@ -120,6 +127,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
 
     // tap a tile: items with options open the pop-up, others go straight in
     function tapItem(item: Item) {
+        if (tableInfo?.canAdd === false) return; // takeaway QR bill: pay only
         if (isMaxed(item)) return;
         if (groupsFor(item).length > 0) setPicking(item);
         else addItem(item, []);
@@ -365,11 +373,11 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                     // RESTAURANT MODE TITLE: "Table 5" + back to the tables
                     <div className="flex items-baseline justify-between px-5 pt-5">
                         <h1 className="text-2xl font-bold">
-                            Table {tableInfo.label}
+                            {tableInfo.title ?? `Table ${tableInfo.label}`}
                             {tableInfo.bill && <span className="ml-2 text-base font-semibold text-ink-2">#{tableInfo.bill.orderNo}</span>}
                         </h1>
-                        <Link href="/tables" className="text-sm font-semibold text-primary">
-                            ← Tables
+                        <Link href={tableInfo.backHref ?? "/tables"} className="text-sm font-semibold text-primary">
+                            ← {tableInfo.backLabel ?? "Tables"}
                         </Link>
                     </div>
                 ) : (
@@ -517,7 +525,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                     (a new round has to be sent or cleared before paying, so nothing gets forgotten) */}
                 {tableInfo ? (
                     <div className="border-t border-line p-5">
-                        {cart.length > 0 || !tableInfo.bill ? (
+                        {(cart.length > 0 && tableInfo.canAdd !== false) || !tableInfo.bill ? (
                             <>
                                 <div className="flex justify-between text-ink-2">
                                     <span>New round</span>
@@ -713,8 +721,8 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                             </Link>
                             {tableInfo ? (
                                 // restaurant mode: the table is free again → back to the tables
-                                <Link href="/tables" className="flex h-14 items-center justify-center rounded-2xl bg-primary font-bold text-white">
-                                    Back to Tables
+                                <Link href={tableInfo.backHref ?? "/tables"} className="flex h-14 items-center justify-center rounded-2xl bg-primary font-bold text-white">
+                                    Back to {tableInfo.backLabel ?? "Tables"}
                                 </Link>
                             ) : (
                                 <button onClick={() => setDone(null)} className="h-14 rounded-2xl bg-primary font-bold text-white">

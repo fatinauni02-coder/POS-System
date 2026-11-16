@@ -3,7 +3,7 @@ import { Suspense } from "react";
 
 import { formatRM, toSen } from "@/lib/money";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { AutoRefresh } from "./auto-refresh";
+import { AutoRefresh } from "@/components/auto-refresh";
 
 // "/order/track/<id>" = the customer's own order status (the id is a long random code only they have)
 export default function TrackPage({ params }: PageProps<"/order/track/[id]">) {
