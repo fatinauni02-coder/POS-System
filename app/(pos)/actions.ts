@@ -192,6 +192,7 @@ export async function approveDiscount(pct: number, pin: string): Promise<Discoun
 
     const business = await getBusiness();
     if (!business) return { ok: false, message: "Shop not found" };
+    if (!(await getStaff())) return { ok: false, message: "Please sign in again." };
 
     const pinError = await checkManagerPin(business.id, pin);
     if (pinError) return { ok: false, message: pinError };

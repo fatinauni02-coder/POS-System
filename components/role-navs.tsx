@@ -1,4 +1,4 @@
-import { BottomNav } from "@/app/bottom-nav";
+import { BottomNav } from "@/app/(pos)/bottom-nav";
 import { getBusiness } from "@/lib/business";
 import { getStaff } from "@/lib/staff";
 import { SideNav } from "./side-nav";

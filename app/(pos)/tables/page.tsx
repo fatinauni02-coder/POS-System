@@ -48,7 +48,6 @@ async function Tables({ searchParams }: { searchParams: PageProps<"/tables">["se
     // table id → its open bill (Map = quick lookup)
     const billFor = new Map((bills ?? []).map((b) => [b.table_id, b]));
     const list = tables ?? [];
-    const now = Date.now();
 
     return (
         <div className="mx-auto flex max-w-5xl flex-col gap-5 p-4 md:p-6">
@@ -72,7 +71,7 @@ async function Tables({ searchParams }: { searchParams: PageProps<"/tables">["se
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {list.map((t) => {
                     const bill = billFor.get(t.id);
-                    const mins = bill ? Math.floor((now - new Date(bill.created_at).getTime()) / 60000) : 0;
+                    const mins = bill ? minutesSince(bill.created_at) : 0;
                     return (
                         <Link
                             key={t.id}
@@ -130,4 +129,9 @@ async function Tables({ searchParams }: { searchParams: PageProps<"/tables">["se
             )}
         </div>
     );
+}
+
+// how long ago, in whole minutes (a helper, so the page itself stays "pure" for React's lint rule)
+function minutesSince(iso: string) {
+    return Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
 }

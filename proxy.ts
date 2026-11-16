@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // runs before EVERY page and Server Action:
 // not signed in → go to /login. Signed in and on /login → go to the Order screen.
+// Exception: the customer QR ordering pages ("/order/…") need no login.
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -22,7 +23,11 @@ export async function proxy(request: NextRequest) {
   // unlike getUser()). It also refreshes an expired login via setAll above.
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims ?? null;
-  const onLogin = request.nextUrl.pathname === "/login";
+  const path = request.nextUrl.pathname;
+  const onLogin = path === "/login";
+
+  // CUSTOMER QR PAGES: open to everyone, no login. ONLY "/order/…" — every other address stays staff-only.
+  if (path === "/order" || path.startsWith("/order/")) return response;
 
   if (!user && !onLogin) return NextResponse.redirect(new URL("/login", request.url));
   if (user && onLogin) return NextResponse.redirect(new URL("/", request.url));
