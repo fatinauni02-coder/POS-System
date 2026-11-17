@@ -8,12 +8,13 @@ import { hasManagerPin } from "@/lib/pin";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PrintButton } from "./print-button";
 import { RefundButton } from "./refund-button";
+import { Loading } from "@/components/loading";
 
 // "/receipt/12" → [id] folder = a changing part of the address; here id = "12"
 // NEW: "?show=bar" / "?show=kitchen" = show that ticket instead of the customer receipt
 export default function ReceiptPage({ params, searchParams }: PageProps<"/receipt/[id]">) {
     return (
-        <Suspense fallback={<p className="p-6">Loading…</p>}>
+        <Suspense fallback={<Loading />}>
             <Receipt params={params} searchParams={searchParams} />
         </Suspense>
     );

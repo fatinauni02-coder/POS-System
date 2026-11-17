@@ -6,11 +6,12 @@ import { formatRM, toSen } from "@/lib/money";
 import { Toast } from "@/components/toast";
 import { supabase } from "@/lib/supabase";
 import { addGroup, addOption, deleteGroup, removeOption, toggleRequired } from "./actions";
+import { Loading } from "@/components/loading";
 
 // "/menu/options" = make and edit option groups (Temperature: Hot / Iced, Milk: Fresh / Oat…)
 export default function OptionsPage({ searchParams }: PageProps<"/menu/options">) {
   return (
-    <Suspense fallback={<p className="p-6">Loading…</p>}>
+    <Suspense fallback={<Loading />}>
       <Options searchParams={searchParams} />
     </Suspense>
   );

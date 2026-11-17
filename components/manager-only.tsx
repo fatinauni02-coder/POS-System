@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 import { requireManager } from "@/lib/staff";
+import { Loading } from "@/components/loading";
 
 // wrap a section of the app: only owners/managers get past it
 export function ManagerOnly({ children }: { children: React.ReactNode }) {
     return (
-        <Suspense fallback={<p className="p-6">Loading…</p>}>
+        <Suspense fallback={<Loading />}>
             <Check>{children}</Check>
         </Suspense>
     );

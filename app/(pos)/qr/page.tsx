@@ -9,11 +9,12 @@ import { formatRM, toSen } from "@/lib/money";
 import { getStaff } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { acceptQr, moveQr, rejectQr, setQrOrdering } from "./actions";
+import { Loading } from "@/components/loading";
 
 // "/qr" = the staff board for orders customers sent from their phones (QR codes)
 export default function QrBoardPage({ searchParams }: PageProps<"/qr">) {
     return (
-        <Suspense fallback={<p className="p-6">Loading…</p>}>
+        <Suspense fallback={<Loading />}>
             <QrBoard searchParams={searchParams} />
         </Suspense>
     );

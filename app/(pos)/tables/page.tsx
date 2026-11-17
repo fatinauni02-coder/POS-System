@@ -8,11 +8,12 @@ import { formatRM, toSen } from "@/lib/money";
 import { getStaff } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { addTable, deleteTable } from "./actions";
+import { Loading } from "@/components/loading";
 
 // "/tables" = restaurant mode: every table, free or with an open bill
 export default function TablesPage({ searchParams }: PageProps<"/tables">) {
     return (
-        <Suspense fallback={<p className="p-6">Loading…</p>}>
+        <Suspense fallback={<Loading />}>
             <Tables searchParams={searchParams} />
         </Suspense>
     );

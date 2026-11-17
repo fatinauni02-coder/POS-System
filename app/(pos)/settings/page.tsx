@@ -4,10 +4,11 @@ import { getBusiness } from "@/lib/business";
 import { Toast } from "@/components/toast";
 import { hasManagerPin } from "@/lib/pin";
 import { changePin, saveSettings } from "./actions";
+import { Loading } from "@/components/loading";
 
 export default function SettingsPage({ searchParams }: PageProps<"/settings">) {
   return (
-    <Suspense fallback={<p className="p-6">Loading…</p>}>
+    <Suspense fallback={<Loading />}>
       <SettingsForm searchParams={searchParams} />
     </Suspense>
   );

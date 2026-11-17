@@ -6,11 +6,12 @@ import { getBusiness } from "@/lib/business";
 import { formatRM, toSen } from "@/lib/money";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Stat } from "@/components/stat";
+import { Loading } from "@/components/loading";
 
 // "/history" = today's orders; "/history?date=2026-10-12" = another day
 export default function HistoryPage({ searchParams }: PageProps<"/history">) {
   return (
-    <Suspense fallback={<p className="p-6">Loading…</p>}>
+    <Suspense fallback={<Loading />}>
       <History searchParams={searchParams} />
     </Suspense>
   );

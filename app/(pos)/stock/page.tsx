@@ -7,10 +7,11 @@ import { addStockItem, adjustStock, updateStockItem } from "./actions";
 import { DeleteStockButton } from "./delete-stock-button";
 import Link from "next/link";
 import { Toast } from "@/components/toast";
+import { Loading } from "@/components/loading";
 
 export default function StockPage({ searchParams }: PageProps<"/stock">) {
     return (
-        <Suspense fallback={<p className="p-6">Loading…</p>}>
+        <Suspense fallback={<Loading />}>
             <Stock searchParams={searchParams} />
         </Suspense>
     );

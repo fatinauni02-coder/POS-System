@@ -8,11 +8,12 @@ import { ItemEditor } from "./item-editor";
 import { RecipeEditor } from "./recipe-editor";
 import { ItemOptionGroups } from "./item-option-groups";
 import { DeleteItemButton } from "./delete-item-button";
+import { Loading } from "@/components/loading";
 
-// "/menu" = Menu management. Suspense shows "Loading…" while Supabase answers.
+// "/menu" = Menu management. Suspense shows the loading spinner while Supabase answers.
 export default function MenuPage({ searchParams }: PageProps<"/menu">) {
     return (
-        <Suspense fallback={<p className="p-6">Loading…</p>}>
+        <Suspense fallback={<Loading />}>
             <MenuContent searchParams={searchParams} />
         </Suspense>
     );

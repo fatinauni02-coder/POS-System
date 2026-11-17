@@ -7,12 +7,13 @@ import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { OrderScreenClient } from "./order-screen-client";
 import type { TableInfo } from "./order-screen";
+import { Loading } from "@/components/loading";
 
 // "/" = the Order screen (the till)
 // "/?table=5" = restaurant mode: ordering for table 5 (the cart becomes the next round)
 export default function OrderPage({ searchParams }: PageProps<"/">) {
   return (
-    <Suspense fallback={<p className="p-6">Loading…</p>}>
+    <Suspense fallback={<Loading />}>
       <OrderContent searchParams={searchParams} />
     </Suspense>
   );

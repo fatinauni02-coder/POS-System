@@ -7,11 +7,12 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { displayName } from "@/lib/username";
 import { addStaff, resetPassword, setRole } from "./actions";
 import { RemoveButton } from "./remove-button";
+import { Loading } from "@/components/loading";
 
 // "/staff" = who can sign in to this shop, and what they may do
 export default function StaffPage({ searchParams }: PageProps<"/staff">) {
     return (
-        <Suspense fallback={<p className="p-6">Loading…</p>}>
+        <Suspense fallback={<Loading />}>
             <Staff searchParams={searchParams} />
         </Suspense>
     );

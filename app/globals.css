@@ -17,6 +17,13 @@
   --color-ink: #251911;       /* main text */
   --color-ink-2: #574238;     /* secondary text */
   --color-primary-soft: #bd5611; /* active menu item */
+
+  /* LOADING BAR: class "animate-loading-bar" = slide from left to right, repeat */
+  --animate-loading-bar: loading-bar 1.2s ease-in-out infinite;
+  @keyframes loading-bar {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
+  }
 }
 
 /* FONT — "font-sans" (the default font) = Plus Jakarta Sans, loaded in layout.tsx.

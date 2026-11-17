@@ -6,12 +6,13 @@ import { Suspense } from "react";
 import { getBusiness } from "@/lib/business";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PrintButton } from "@/app/(pos)/receipt/[id]/print-button";
+import { Loading } from "@/components/loading";
 
 // "/tables/qr" = printable QR codes: one card per table + one takeaway card for the counter.
 // Managers only: app/(pos)/tables/qr/layout.tsx (staff can see /tables, but not this page).
 export default function QrCodesPage() {
     return (
-        <Suspense fallback={<p className="p-6">Loading…</p>}>
+        <Suspense fallback={<Loading />}>
             <QrCodes />
         </Suspense>
     );

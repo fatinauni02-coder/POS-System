@@ -3,12 +3,13 @@ import { Suspense } from "react";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { CustomerMenu } from "./customer-menu";
+import { Loading } from "@/components/loading";
 
 // "/order/<code>" = the page a customer opens by scanning a QR code.
 // <code> = a table's random qr_code (dine-in or takeaway) or the shop's takeaway_qr_code (takeaway only).
 export default function QrOrderPage({ params }: PageProps<"/order/[code]">) {
     return (
-        <Suspense fallback={<p className="p-6">Loading menu…</p>}>
+        <Suspense fallback={<Loading text="Loading menu…" />}>
             <QrOrder params={params} />
         </Suspense>
     );

@@ -4,11 +4,12 @@ import { getBusiness } from "@/lib/business";
 import { Toast } from "@/components/toast";
 import { supabase } from "@/lib/supabase";
 import { addCategory, deleteCategory, updateCategory } from "./actions";
+import { Loading } from "@/components/loading";
 
 // "/menu/categories" = manage categories; "?error=…" = show a message from the last save
 export default function CategoriesPage({ searchParams }: PageProps<"/menu/categories">) {
     return (
-        <Suspense fallback={<p className="p-6">Loading…</p>}>
+        <Suspense fallback={<Loading />}>
             <Categories searchParams={searchParams} />
         </Suspense>
     );

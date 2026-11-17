@@ -5,11 +5,12 @@ import { Suspense } from "react";
 import { getBusiness } from "@/lib/business";
 import { addDays, dayInKL, TZ } from "@/lib/dates";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { Loading } from "@/components/loading";
 
 // "/stock/history" = today's stock changes; "?date=2026-10-12&item=<id>" = another day / one item
 export default function StockHistoryPage({ searchParams }: PageProps<"/stock/history">) {
   return (
-    <Suspense fallback={<p className="p-6">Loading…</p>}>
+    <Suspense fallback={<Loading />}>
       <StockHistory searchParams={searchParams} />
     </Suspense>
   );
