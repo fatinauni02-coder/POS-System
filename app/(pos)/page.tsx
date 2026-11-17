@@ -136,15 +136,19 @@ async function loadTable(businessId: string, label: string): Promise<TableInfo |
 
 // a TAKEAWAY bill opened by an accepted QR order: pay only (no more rounds), then back to the QR board
 async function loadTakeawayBill(businessId: string, orderId: number): Promise<TableInfo> {
-  const { data: bill } = await supabaseAdmin
-    .from("orders")
-    .select(`${BILL_SELECT}, customer_name`)
-    .eq("business_id", businessId)
-    .eq("id", orderId)
-    .eq("order_type", "takeaway")
-    .eq("status", "open")
-    .order("id", { referencedTable: "order_items" })
-    .maybeSingle();
+  const [{ data: bill }, { data: qr }] = await Promise.all([
+    supabaseAdmin
+      .from("orders")
+      .select(`${BILL_SELECT}, customer_name`)
+      .eq("business_id", businessId)
+      .eq("id", orderId)
+      .eq("order_type", "takeaway")
+      .eq("status", "open")
+      .order("id", { referencedTable: "order_items" })
+      .maybeSingle(),
+    // the phone order that opened this bill → "Collected" button after paying
+    supabaseAdmin.from("qr_orders").select("id").eq("business_id", businessId).eq("order_id", orderId).maybeSingle(),
+  ]);
 
   return {
     label: "",
@@ -152,6 +156,7 @@ async function loadTakeawayBill(businessId: string, orderId: number): Promise<Ta
     canAdd: false,
     backHref: "/qr",
     backLabel: "QR orders",
+    qrId: qr?.id ?? null,
     bill: toBill(bill),
   };
 }

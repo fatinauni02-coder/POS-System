@@ -72,6 +72,29 @@ export async function moveQr(formData: FormData) {
     back("msg", status === "ready" ? "Marked ready — the customer sees it on their phone" : "Done");
 }
 
+// "Collected" straight from the payment pop-up (takeaway): Preparing/Ready → Done in one tap
+export async function collectQr(formData: FormData) {
+    const business = await shopForStaff();
+    const id = qrId(formData);
+    const { data: q } = await supabaseAdmin
+        .from("qr_orders")
+        .select("ticket_no, status")
+        .eq("business_id", business.id)
+        .eq("id", id)
+        .maybeSingle();
+    if (!q) back("error", "That order is gone.");
+    if (q.status === "done") back("msg", `Q${q.ticket_no} was already collected`);
+
+    // set_qr_status only moves one step at a time: preparing → ready → done
+    if (q.status === "preparing") {
+        const { error } = await supabaseAdmin.rpc("set_qr_status", { p_business_id: business.id, p_id: id, p_status: "ready" });
+        if (error) back("error", MESSAGES[error.message] ?? "Couldn't update the order.");
+    }
+    const { error } = await supabaseAdmin.rpc("set_qr_status", { p_business_id: business.id, p_id: id, p_status: "done" });
+    if (error) back("error", MESSAGES[error.message] ?? "Couldn't update the order.");
+    back("msg", `Q${q.ticket_no} paid and collected`);
+}
+
 // pause / restart QR ordering (managers)
 export async function setQrOrdering(formData: FormData) {
     await requireManager();

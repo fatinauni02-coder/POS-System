@@ -5,6 +5,7 @@ import { OptionPicker } from "./option-picker";
 import { formatRM, toSen } from "@/lib/money";
 import { CheckoutPanel, type Method } from "./checkout-panel";
 import { payBill, placeOrder, sendRound } from "./actions";
+import { collectQr } from "./qr/actions";
 import Link from "next/link";
 import { DiscountPanel } from "./discount-panel";
 import { VoidLineButton } from "./void-line-button";
@@ -33,6 +34,7 @@ export type TableInfo = {
     canAdd?: boolean; // false = pay only, no new rounds (takeaway QR bills)
     backHref?: string; // where "back" goes (default /tables)
     backLabel?: string;
+    qrId?: string | null; // takeaway bill from a QR order → "Collected" after paying
 };
 
 type Props = { categories: Category[]; items: Item[]; groups: Group[]; sstRate: number; tables: string[]; tableInfo: TableInfo | null };
@@ -728,6 +730,13 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                                 <button onClick={() => setDone(null)} className="h-14 rounded-2xl bg-primary font-bold text-white">
                                     Next customer
                                 </button>
+                            )}
+                            {/* QR takeaway: paid AND handed over in one go → marks the phone order Done, back to the board */}
+                            {tableInfo?.qrId && (
+                                <form action={collectQr} className="col-span-2">
+                                    <input type="hidden" name="id" value={tableInfo.qrId} />
+                                    <button className="h-14 w-full rounded-2xl bg-green-700 font-bold text-white">Collected ✓</button>
+                                </form>
                             )}
                         </div>
                     </div>
