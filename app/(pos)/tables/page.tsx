@@ -108,7 +108,12 @@ async function Tables({ searchParams }: { searchParams: PageProps<"/tables">["se
             {/* MANAGERS ONLY: add / remove tables */}
             {isManager && (
                 <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4">
-                    <p className="font-bold">Manage tables</p>
+                    <div className="flex items-center justify-between">
+                        <p className="font-bold">Manage tables</p>
+                        <Link href="/tables/qr" className="font-semibold text-primary underline">
+                            Print QR codes
+                        </Link>
+                    </div>
                     <form action={addTable} className="flex gap-2">
                         <input name="label" required maxLength={20} placeholder="e.g. 5 or Patio 1" className={`${INPUT} flex-1`} />
                         <button className="h-11 rounded-xl bg-primary px-5 font-bold text-white">Add</button>
