@@ -37,6 +37,7 @@ export function CustomerMenu({ code, shopName, tagline, tableLabel, sstRate, cat
     const [cart, setCart] = useState<CartLine[]>([]);
     const [loaded, setLoaded] = useState(false);
     const [activeCat, setActiveCat] = useState(categories[0]?.id ?? "all");
+    const [search, setSearch] = useState(""); // text in the search box
     const [picking, setPicking] = useState<Item | null>(null);
     const [showCart, setShowCart] = useState(false);
     const [type, setType] = useState<"dine_in" | "takeaway">(tableLabel ? "dine_in" : "takeaway");
@@ -54,7 +55,13 @@ export function CustomerMenu({ code, shopName, tagline, tableLabel, sstRate, cat
         if (loaded) localStorage.setItem(cartKey, JSON.stringify(cart));
     }, [cart, cartKey, loaded]);
 
-    const shown = activeCat === "all" ? items : items.filter((i) => i.category_id === activeCat);
+    // typing searches the whole menu (ignores the chips); empty box = the selected category
+    const query = search.trim().toLowerCase();
+    const shown = query
+        ? items.filter((i) => i.name.toLowerCase().includes(query))
+        : activeCat === "all"
+          ? items
+          : items.filter((i) => i.category_id === activeCat);
     const groupsFor = (item: Item) => groups.filter((g) => item.menu_item_option_groups.some((l) => l.group_id === g.id));
 
     function tapItem(item: Item) {
@@ -113,8 +120,23 @@ export function CustomerMenu({ code, shopName, tagline, tableLabel, sstRate, cat
                 </p>
             </header>
 
-            {/* CATEGORY CHIPS (scroll sideways) */}
-            <div className="sticky top-0 z-10 flex gap-2 overflow-x-auto bg-canvas px-5 py-3">
+            {/* SEARCH + CATEGORY CHIPS: stay at the top while the menu scrolls */}
+            <div className="sticky top-0 z-10 bg-canvas px-5 pt-3">
+                <div className="relative">
+                    <input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search menu…"
+                        className="h-11 w-full rounded-full border border-line bg-surface px-4 pr-10 text-base outline-none focus:ring-2 focus:ring-primary"
+                    />
+                    {search && (
+                        <button onClick={() => setSearch("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 text-xl text-ink-2">
+                            ×
+                        </button>
+                    )}
+                </div>
+            </div>
+            <div className="sticky top-14 z-10 flex gap-2 overflow-x-auto bg-canvas px-5 py-3">
                 {[...categories, { id: "all", name: "All" }].map((c) => (
                     <button
                         key={c.id}
@@ -128,7 +150,7 @@ export function CustomerMenu({ code, shopName, tagline, tableLabel, sstRate, cat
 
             {/* MENU LIST: one row per item, big tap area for thumbs */}
             <div className="flex flex-1 flex-col gap-2 px-5 pb-28">
-                {shown.length === 0 && <p className="py-10 text-center text-ink-2">Nothing here yet</p>}
+                {shown.length === 0 && <p className="py-10 text-center text-ink-2">{query ? `No items match “${search.trim()}”` : "Nothing here yet"}</p>}
                 {shown.map((item) => (
                     <button
                         key={item.id}
