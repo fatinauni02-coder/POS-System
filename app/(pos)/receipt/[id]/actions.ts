@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 
 import { getBusiness } from "@/lib/business";
 import { checkManagerPin } from "@/lib/pin";
+import { getStaff } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const MESSAGES: Record<string, string> = {
@@ -18,6 +19,7 @@ export async function refundOrder(orderId: number, pin: string, restock: boolean
 
   const business = await getBusiness();
   if (!business) return "Shop not found.";
+  if (!(await getStaff())) return "Please sign in again."; // staff only (the PIN alone isn't enough)
 
   // checked HERE on the server — the browser can't skip it
   const pinError = await checkManagerPin(business.id, pin);

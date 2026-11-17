@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { visibleNav } from "@/components/side-nav";
+import { QrBadge, visibleNav } from "@/components/side-nav";
 
-export function BottomNav({ isManager, isRestaurant }: { isManager: boolean; isRestaurant: boolean }) {
+export function BottomNav({ isManager, isRestaurant, newQr }: { isManager: boolean; isRestaurant: boolean; newQr: number }) {
   const pathname = usePathname();
 
   return (
@@ -15,12 +15,13 @@ export function BottomNav({ isManager, isRestaurant }: { isManager: boolean; isR
           <Link
             key={href}
             href={href}
-            className={`flex flex-1 flex-col items-center gap-1 py-2 text-xs ${
+            className={`relative flex flex-1 flex-col items-center gap-1 py-2 text-xs ${
               active ? "text-primary font-semibold" : "text-ink-2"
             }`}
           >
             <Icon size={22} />
             {label}
+            {href === "/qr" && newQr > 0 && <QrBadge count={newQr} />}
           </Link>
         );
       })}

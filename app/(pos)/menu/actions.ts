@@ -4,9 +4,11 @@ import { refresh } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { redirect } from "next/navigation";
 import { getBusiness } from "@/lib/business";
-import { requireManager } from "@/lib/staff";
+import { getStaff, requireManager } from "@/lib/staff";
 
 export async function toggleSoldOut(formData: FormData) {
+    // any signed-in staff (not only managers) may mark an item sold out — but never someone signed out
+    if (!(await getStaff())) throw new Error("Please sign in again.");
     const business = await getBusiness();
     if (!business) throw new Error("Shop not found");
 

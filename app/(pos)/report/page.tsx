@@ -6,7 +6,7 @@ import { getBusiness } from "@/lib/business";
 import { addDays, dayInKL, TZ } from "@/lib/dates";
 import { formatRM, toSen } from "@/lib/money";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { PrintButton } from "@/app/receipt/[id]/print-button";
+import { PrintButton } from "@/app/(pos)/receipt/[id]/print-button";
 
 // "/report" = today; "/report?date=2026-10-14" = another day
 export default function ReportPage({ searchParams }: PageProps<"/report">) {
