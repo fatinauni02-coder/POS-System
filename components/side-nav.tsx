@@ -24,8 +24,15 @@ export function visibleNav(isManager: boolean, isRestaurant: boolean) {
   return NAV.filter((n) => (isManager || !n.managerOnly) && (isRestaurant || !n.restaurantOnly));
 }
 
-// newQr = how many phone orders are waiting → red number on the "QR" button
-export function SideNav({ isManager, isRestaurant, newQr }: { isManager: boolean; isRestaurant: boolean; newQr: number }) {
+// what the nav needs to know: role, mode, and the numbers for the badges
+export type NavProps = {
+  isManager: boolean;
+  isRestaurant: boolean;
+  newQr: number; // phone orders waiting → red number on "QR"
+  lowStock: number; // stock items low or out → amber number on "Stock" (managers only)
+};
+
+export function SideNav({ isManager, isRestaurant, newQr, lowStock }: NavProps) {
   const path = usePathname(); // the current address, e.g. "/menu"
 
   return (
@@ -61,7 +68,7 @@ export function SideNav({ isManager, isRestaurant, newQr }: { isManager: boolean
               {/* icon size: h-5 w-5 (20px). Try h-6 w-6 for bigger */}
               <Icon className="h-5 w-5" />
               {label}
-              {href === "/qr" && newQr > 0 && <QrBadge count={newQr} />}
+              <NavBadge href={href} newQr={newQr} lowStock={lowStock} />
             </Link>
           );
         })}
@@ -70,10 +77,17 @@ export function SideNav({ isManager, isRestaurant, newQr }: { isManager: boolean
   );
 }
 
-// small red circle with a number, top-right of a nav button
-export function QrBadge({ count }: { count: number }) {
+// small circle with a number, top-right of a nav button:
+// red on "QR" (orders waiting), amber on "Stock" (items low or out)
+export function NavBadge({ href, newQr, lowStock }: { href: string; newQr: number; lowStock: number }) {
+  const count = href === "/qr" ? newQr : href === "/stock" ? lowStock : 0;
+  if (count === 0) return null;
   return (
-    <span className="absolute right-1 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">
+    <span
+      className={`absolute right-1 top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold text-white ${
+        href === "/qr" ? "bg-red-600" : "bg-amber-500"
+      }`}
+    >
       {count}
     </span>
   );

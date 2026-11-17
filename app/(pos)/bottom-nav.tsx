@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { QrBadge, visibleNav } from "@/components/side-nav";
+import { NavBadge, visibleNav, type NavProps } from "@/components/side-nav";
 
-export function BottomNav({ isManager, isRestaurant, newQr }: { isManager: boolean; isRestaurant: boolean; newQr: number }) {
+export function BottomNav({ isManager, isRestaurant, newQr, lowStock }: NavProps) {
   const pathname = usePathname();
 
   return (
@@ -21,7 +21,7 @@ export function BottomNav({ isManager, isRestaurant, newQr }: { isManager: boole
           >
             <Icon size={22} />
             {label}
-            {href === "/qr" && newQr > 0 && <QrBadge count={newQr} />}
+            <NavBadge href={href} newQr={newQr} lowStock={lowStock} />
           </Link>
         );
       })}
