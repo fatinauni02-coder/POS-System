@@ -72,6 +72,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
 
     // ---------- STATE (values that change → screen redraws) ----------
     const [activeCat, setActiveCat] = useState(categories[0]?.id ?? "all"); // selected chip; starts on the 1st category
+    const [search, setSearch] = useState(""); // text in the search box
     const [cart, setCart] = useState<CartLine[]>(() => loadCart(cartKey));
     const [picking, setPicking] = useState<Item | null>(null); // item whose pop-up is open
     const [paying, setPaying] = useState(false); // payment pop-up open?
@@ -99,7 +100,13 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
     }, [held]);
 
     // items for the selected chip ("all" = every item)
-    const shown = activeCat === "all" ? items : items.filter((i) => i.category_id === activeCat);
+    // typing searches ALL items (ignores the chips); empty box = the selected category as before
+    const query = search.trim().toLowerCase();
+    const shown = query
+        ? items.filter((i) => i.name.toLowerCase().includes(query))
+        : activeCat === "all"
+          ? items
+          : items.filter((i) => i.category_id === activeCat);
 
     // the option groups this item uses (e.g. Latte → Temperature, Milk)
     function groupsFor(item: Item) {
@@ -291,6 +298,21 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                 flex-col gap-4 = chips row on top, grid below, 4 apart
                 p-5 = space around the edges */}
             <main className="flex min-w-0 flex-1 flex-col gap-4 p-3 lg:p-5">
+                {/* SEARCH BOX: × clears it */}
+                <div className="relative">
+                    <input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search menu…"
+                        className="h-11 w-full rounded-2xl border border-line bg-surface px-4 pr-10 font-semibold outline-none focus:ring-2 focus:ring-primary"
+                    />
+                    {search && (
+                        <button onClick={() => setSearch("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 text-xl text-ink-2">
+                            ×
+                        </button>
+                    )}
+                </div>
+
                 {/* CATEGORY CHIPS: one row, gap-2 between chips
                     overflow-x-auto = too many chips → the row scrolls sideways (pb-1 = room for the scrollbar) */}
                 <div className="flex gap-2 overflow-x-auto pb-1">
@@ -348,6 +370,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                             )}
                         </button>
                     ))}
+                    {shown.length === 0 && <p className="col-span-full py-10 text-center text-ink-2">{query ? `No items match “${search.trim()}”` : "No items in this category"}</p>}
                 </div>
                 {count > 0 && (
                     <button
