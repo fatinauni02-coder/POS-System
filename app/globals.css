@@ -71,3 +71,11 @@ html {
 @utility no-scrollbar { scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 @utility btn-primary { @apply press rounded-2xl bg-primary font-bold text-on-primary hover:bg-primary-strong disabled:opacity-40 disabled:hover:bg-primary; }
 @utility btn-soft { @apply press rounded-xl bg-tint font-semibold text-ink-2 hover:bg-tint-3 disabled:opacity-40; }
+
+/* RECEIPT PAGE: the receipt + tickets are all on the page; only the picked tab shows (.doc-hidden).
+   "Print all" adds body.print-all → every doc prints, each on its own piece of paper. */
+.doc-hidden { display: none; }
+@media print {
+  body.print-all .doc-hidden { display: block; }
+  body.print-all .doc { break-after: page; }
+}
