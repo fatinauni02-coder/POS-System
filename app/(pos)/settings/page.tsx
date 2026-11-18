@@ -36,9 +36,9 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
   if (!business) return <p className="p-6 text-danger">Shop not found</p>;
   const hasPin = await hasManagerPin(business.id);
 
-  // every section of the settings form is ON the page (so Save sends all of them);
-  // the ones not picked are only hidden
-  const show = (id: Tab) => (tab === id ? "" : "hidden");
+  // every section of the settings form is ON the page (so Save sends all of them).
+  // Big screens (lg): only the picked tab shows. Phones / tablets: ALL sections, one under the other.
+  const show = (id: Tab) => (tab === id ? "" : "lg:hidden");
 
   return (
     <div className="flex flex-col">
@@ -48,7 +48,7 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
       {typeof params.pinError === "string" && <Toast key={String(params.t)} kind="error" text={params.pinError} />}
 
       {/* HEADER — the buttons sit outside the form, so form="settings" links them to it */}
-      <div className="flex flex-wrap items-center gap-3 border-b border-line bg-surface px-6 py-4">
+      <div className="flex flex-wrap items-center gap-3 border-b border-line bg-surface px-4 py-4 md:px-6">
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-tint text-primary">
           <Settings className="h-6 w-6" />
         </span>
@@ -60,10 +60,11 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
               Manager
             </span>
           </h1>
-          <p className="text-sm text-ink-2">Business details, tax, receipt and service style</p>
+          <p className="hidden text-sm text-ink-2 sm:block">Business details, tax, receipt and service style</p>
         </div>
         {tab !== "security" && (
-          <>
+          // big screens only — phones use the Save bar at the bottom
+          <div className="hidden gap-2 lg:flex">
             {/* type="reset" = put every box back to what was saved */}
             <button type="reset" form="settings" className="btn-soft h-12 px-5">
               Discard
@@ -72,19 +73,19 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
               <Save className="h-5 w-5" />
               Save settings
             </button>
-          </>
+          </div>
         )}
       </div>
 
-      <div className="flex flex-col gap-5 p-6 lg:flex-row">
+      <div className="flex flex-col gap-4 p-4 md:p-6 lg:flex-row lg:gap-5">
         {/* LEFT: sections */}
-        <nav aria-label="Settings sections" className="card flex shrink-0 gap-1 self-start overflow-x-auto p-2 lg:w-64 lg:flex-col lg:p-3">
+        <nav aria-label="Settings sections" className="card hidden w-64 shrink-0 flex-col gap-1 self-start p-3 lg:flex">
           {TABS.map(({ id, label, Icon }) => (
             <Link
               key={id}
               href={id === "business" ? "/settings" : `/settings?tab=${id}`}
               aria-current={tab === id ? "page" : undefined}
-              className={`press flex shrink-0 items-center gap-3 rounded-xl px-3 py-3 font-semibold whitespace-nowrap ${
+              className={`press flex items-center gap-3 rounded-xl px-3 py-3 font-semibold ${
                 tab === id ? "bg-primary-soft text-on-primary" : "hover:bg-tint"
               }`}
             >
@@ -96,7 +97,7 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
 
         <main className="min-w-0 flex-1">
           {/* THE SETTINGS FORM (one form for every section except the PIN) */}
-          <form id="settings" action={saveSettings}>
+          <form id="settings" action={saveSettings} className="flex flex-col gap-4 lg:block">
             <input type="hidden" name="tab" value={tab} />
 
             <div className={show("business")}>
@@ -187,8 +188,19 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
             </div>
           </form>
 
+          {/* PHONE SAVE BAR — stays at the bottom while you scroll (sticky); hidden on big screens */}
+          <div className="sticky bottom-0 z-10 -mx-4 mt-4 md:-mx-6 flex gap-2 border-t border-line bg-surface p-3 shadow-panel lg:hidden">
+            <button type="reset" form="settings" className="btn-soft h-12 flex-1">
+              Discard
+            </button>
+            <button form="settings" className="btn-primary flex h-12 flex-[2] items-center justify-center gap-2">
+              <Save className="h-5 w-5" />
+              Save settings
+            </button>
+          </div>
+
           {/* MANAGER PIN: its own form + its own Server Action */}
-          <form action={changePin} className={show("security")}>
+          <form action={changePin} className={`mt-4 lg:mt-0 ${show("security")}`}>
             <Section title="Manager PIN" desc={hasPin ? "Needed for refunds and discounts. Enter the current PIN to change it." : "No PIN yet — set one here."}>
               <div className="grid gap-4 sm:grid-cols-3">
                 {hasPin && (
@@ -203,7 +215,7 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
                   <input name="again" type="password" inputMode="numeric" maxLength={6} required autoComplete="new-password" className={INPUT} />
                 </Field>
               </div>
-              <button className="btn-primary mt-5 flex h-12 items-center gap-2 px-6">
+              <button className="btn-primary mt-5 flex h-12 w-full items-center justify-center gap-2 px-6 sm:w-auto">
                 <LockKeyhole className="h-5 w-5" />
                 {hasPin ? "Change PIN" : "Set PIN"}
               </button>
@@ -218,10 +230,10 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
 // a white card with a title + one line under it
 function Section({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
   return (
-    <section className="card p-6">
-      <h2 className="text-xl font-bold">{title}</h2>
+    <section className="card p-4 md:p-6">
+      <h2 className="text-lg font-bold md:text-xl">{title}</h2>
       {desc && <p className="mt-0.5 text-sm text-ink-2">{desc}</p>}
-      <div className="mt-5">{children}</div>
+      <div className="mt-4 md:mt-5">{children}</div>
     </section>
   );
 }
@@ -240,7 +252,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 // a real checkbox, drawn as an on/off switch (group-has-[:checked] = "when the box inside is ticked")
 function SwitchRow({ name, on, title, desc }: { name: string; on: boolean; title: string; desc: string }) {
   return (
-    <label className="group flex cursor-pointer items-center gap-4 rounded-2xl border border-line p-4">
+    <label className="group flex cursor-pointer items-center gap-3 rounded-2xl border border-line p-3 md:gap-4 md:p-4">
       <span className="flex-1">
         <span className="block font-semibold">{title}</span>
         <span className="text-sm text-ink-2">{desc}</span>
@@ -270,14 +282,14 @@ function ModeCard({
   points: string[];
 }) {
   return (
-    <label className="group press cursor-pointer rounded-2xl border-2 border-line p-5 hover:bg-tint has-[:checked]:border-primary-soft has-[:checked]:bg-tint">
+    <label className="group press cursor-pointer rounded-2xl border-2 border-line p-4 hover:bg-tint md:p-5 has-[:checked]:border-primary-soft has-[:checked]:bg-tint">
       <input type="radio" name="service_mode" value={value} defaultChecked={on} className="sr-only" />
       <span className="flex items-center gap-3">
         <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-tint text-primary group-has-[:checked]:bg-primary group-has-[:checked]:text-on-primary">
           <Icon className="h-6 w-6" />
         </span>
         <span className="flex-1">
-          <span className="block text-lg font-bold">{title}</span>
+          <span className="block font-bold md:text-lg">{title}</span>
           <span className="text-sm text-ink-2">{desc}</span>
         </span>
         <CircleCheck className="hidden h-6 w-6 text-primary group-has-[:checked]:block" />
