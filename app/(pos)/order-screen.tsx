@@ -360,14 +360,14 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                             disabled={!item.is_available || isMaxed(item)}
                             className="flex flex-col rounded-2xl border border-line bg-surface p-3 text-left hover:border-primary disabled:opacity-50"
                         >
-                            {/* PICTURE placeholder: aspect-[4/3] = always 4 wide : 3 tall (aspect-square = square)
+                            {/* PICTURE placeholder: aspect-square = always square (aspect-[4/3] = 4 wide : 3 tall)
                                 text-3xl = letter size; text-primary/50 = orange at 50% */}
                             {item.image_url ? (
                                 // the item's photo (Menu → Upload photo); lazy = loads when scrolled into view
                                 // eslint-disable-next-line @next/next/no-img-element -- photo from Supabase Storage
-                                <img src={item.image_url} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-xl object-cover" />
+                                <img src={item.image_url} alt="" loading="lazy" className="aspect-square w-full rounded-xl object-cover" />
                             ) : (
-                                <span className="flex aspect-[4/3] items-center justify-center rounded-xl bg-tint text-3xl font-bold text-primary/50">
+                                <span className="flex aspect-square items-center justify-center rounded-xl bg-tint text-3xl font-bold text-primary/50">
                                     {item.name.charAt(0)}
                                 </span>
                             )}
