@@ -8,16 +8,16 @@ export function DeleteStockButton({ name }: { name: string }) {
 
     return sure ? (
         <>
-            <button type="button" onClick={() => setSure(false)} className="h-11 rounded-xl bg-tint px-4 font-semibold">
+            <button type="button" onClick={() => setSure(false)} className="btn-soft h-12 px-4">
                 Keep
             </button>
             {/* formAction = send THIS form to a different action than the form's own (Save) */}
-            <button formAction={deleteStockItem} className="h-11 rounded-xl bg-red-700 px-4 font-bold text-white">
+            <button formAction={deleteStockItem} className="press h-12 rounded-xl bg-danger px-4 font-bold text-white">
                 Delete {name}
             </button>
         </>
     ) : (
-        <button type="button" onClick={() => setSure(true)} className="ml-auto h-11 rounded-xl px-4 font-semibold text-red-700 hover:bg-red-50">
+        <button type="button" onClick={() => setSure(true)} className="press h-12 rounded-xl px-3 font-semibold text-danger hover:bg-danger/10">
             Delete
         </button>
     );
