@@ -1,3 +1,4 @@
+import { Store } from "lucide-react";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
@@ -20,9 +21,12 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // a friendly full-page message (bad code, paused…)
 function Message({ title, text }: { title: string; text: string }) {
     return (
-        <div className="flex min-h-dvh flex-col items-center justify-center gap-2 p-8 text-center">
-            <h1 className="text-2xl font-bold">{title}</h1>
-            <p className="text-ink-2">{text}</p>
+        <div className="flex min-h-dvh flex-col items-center justify-center gap-3 p-8 text-center">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-tint text-primary">
+                <Store className="h-8 w-8" />
+            </span>
+            <h1 className="text-xl font-bold">{title}</h1>
+            <p className="max-w-xs text-ink-2">{text}</p>
         </div>
     );
 }
@@ -42,7 +46,7 @@ async function QrOrder({ params }: { params: PageProps<"/order/[code]">["params"
 
     const { data: shop } = await supabaseAdmin
         .from("businesses")
-        .select("name, tagline, sst_registered, sst_rate, qr_ordering")
+        .select("name, tagline, logo_url, sst_registered, sst_rate, qr_ordering")
         .eq("id", businessId)
         .single();
     if (!shop) return <Message title="QR code not found" text="Please ask the staff for help." />;
@@ -53,7 +57,7 @@ async function QrOrder({ params }: { params: PageProps<"/order/[code]">["params"
         supabaseAdmin.from("categories").select("id, name").eq("business_id", businessId).order("sort_order"),
         supabaseAdmin
             .from("menu_items")
-            .select("id, name, price, category_id, is_available, show_in_app, menu_item_option_groups(group_id)")
+            .select("id, name, description, image_url, price, category_id, is_available, show_in_app, menu_item_option_groups(group_id)")
             .eq("business_id", businessId)
             .order("name"),
         supabaseAdmin
@@ -82,6 +86,7 @@ async function QrOrder({ params }: { params: PageProps<"/order/[code]">["params"
             code={code}
             shopName={shop.name}
             tagline={shop.tagline}
+            logoUrl={shop.logo_url}
             tableLabel={table?.label ?? null}
             sstRate={shop.sst_registered ? Number(shop.sst_rate) : 0}
             categories={categories ?? []}
