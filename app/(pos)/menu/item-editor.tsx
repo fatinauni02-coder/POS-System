@@ -27,8 +27,8 @@ export function ItemEditor({ item, categories }: Props) {
 
             {/* TITLE: small label + big name (truncate = cut with "…" if too long) */}
             <div>
-                <p className="text-[11px] font-bold tracking-wider text-ink-2 uppercase">{item.id ? "Editing item" : "New item"}</p>
-                <h2 className="truncate text-2xl font-bold">{name || "Untitled item"}</h2>
+                <span className="label-caps rounded bg-tint px-1.5 py-0.5 text-ink-2">{item.id ? "Editing item" : "New item"}</span>
+                <h2 className="mt-1 truncate text-2xl font-bold">{name || "Untitled item"}</h2>
             </div>
 
             {/* ONE FIELD = label text + input. All inputs share the same look:
@@ -42,7 +42,7 @@ export function ItemEditor({ item, categories }: Props) {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     maxLength={60}
-                    className="mt-1 h-12 w-full rounded-xl bg-tint px-4 font-semibold outline-none focus:ring-2 focus:ring-primary"
+                    className="mt-1 h-12 w-full rounded-xl bg-tint px-4 font-semibold outline-none focus:ring-2 focus:ring-primary-soft"
                 />
             </label>
 
@@ -57,7 +57,7 @@ export function ItemEditor({ item, categories }: Props) {
                         value={price}
                         onChange={(e) => setPrice(e.target.value)}
                         inputMode="decimal"
-                        className="mt-1 h-12 w-full rounded-xl bg-tint px-4 font-semibold outline-none focus:ring-2 focus:ring-primary"
+                        className="mt-1 h-12 w-full rounded-xl bg-tint px-4 font-semibold outline-none focus:ring-2 focus:ring-primary-soft"
                     />
                 </label>
                 <label className="block">
@@ -65,7 +65,7 @@ export function ItemEditor({ item, categories }: Props) {
                     <select
                         name="category_id"
                         defaultValue={item.category_id ?? ""}
-                        className="mt-1 h-12 w-full rounded-xl bg-tint px-3 font-semibold outline-none focus:ring-2 focus:ring-primary"
+                        className="mt-1 h-12 w-full rounded-xl bg-tint px-3 font-semibold outline-none focus:ring-2 focus:ring-primary-soft"
                     >
                         <option value="">No category</option>
                         {categories.map((c) => (
@@ -77,7 +77,7 @@ export function ItemEditor({ item, categories }: Props) {
                 </label>
             </div>
             {/* red warning under the price, only while the price is wrong */}
-            {!priceOk && <p className="text-sm font-semibold text-red-700">Enter a price like 12.50</p>}
+            {!priceOk && <p className="text-sm font-semibold text-danger">Enter a price like 12.50</p>}
 
             {/* DESCRIPTION: rows={2} = 2 lines tall; p-4 = inner space */}
             <label className="block">
@@ -87,12 +87,12 @@ export function ItemEditor({ item, categories }: Props) {
                     defaultValue={item.description ?? ""}
                     rows={2}
                     maxLength={120}
-                    className="mt-1 w-full rounded-xl bg-tint p-4 outline-none focus:ring-2 focus:ring-primary"
+                    className="mt-1 w-full rounded-xl bg-tint p-4 outline-none focus:ring-2 focus:ring-primary-soft"
                 />
             </label>
 
             {/* SAVE BUTTON: h-12 = height; faded (opacity-40) and not clickable until name + price are OK */}
-            <button disabled={!canSave} className="h-12 rounded-2xl bg-primary font-bold text-white disabled:opacity-40">
+            <button disabled={!canSave} className="btn-primary h-12">
                 {item.id ? "Save changes" : "Add item"}
             </button>
         </form>

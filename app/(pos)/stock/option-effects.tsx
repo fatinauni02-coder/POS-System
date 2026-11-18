@@ -35,7 +35,7 @@ export async function OptionEffects() {
   const stockOf = (id: string | null) => stockList.find((s) => s.id === id);
 
   return (
-    <section className="rounded-2xl border border-line bg-surface p-5">
+    <section className="card p-5">
       <h2 className="text-lg font-bold">Options that change stock</h2>
       <p className="text-sm text-ink-2">e.g. Oat milk uses oat milk instead of fresh milk · Iced also uses 150 g ice</p>
 

@@ -4,9 +4,10 @@ import { useState } from "react";
 
 import { refundOrder } from "./actions";
 
-type Props = { orderId: number; hasPin: boolean };
+// className / children: so Order history can show it in its own style
+type Props = { orderId: number; hasPin: boolean; className?: string; children?: React.ReactNode };
 
-export function RefundButton({ orderId, hasPin }: Props) {
+export function RefundButton({ orderId, hasPin, className, children }: Props) {
   const [open, setOpen] = useState(false);
   const [pin, setPin] = useState("");
   const [restock, setRestock] = useState(false);
@@ -28,8 +29,8 @@ export function RefundButton({ orderId, hasPin }: Props) {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="col-span-2 h-12 rounded-2xl border border-red-200 font-semibold text-red-700">
-        Refund this order
+      <button onClick={() => setOpen(true)} className={className ?? "col-span-2 h-12 rounded-2xl border border-red-200 font-semibold text-red-700"}>
+        {children ?? "Refund this order"}
       </button>
 
       {open && (

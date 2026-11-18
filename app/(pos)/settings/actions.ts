@@ -8,15 +8,20 @@ import { getBusiness } from "@/lib/business";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireManager } from "@/lib/staff";
 
-// go back to /settings with a red message
-function fail(message: string): never {
-    redirect(`/settings?error=${encodeURIComponent(message)}&t=${Date.now()}`);
+// which section was open ("?tab=…"), so we go back to the same one
+const TABS = ["business", "tax", "receipt", "service"];
+
+// go back to /settings (same section) with a red message
+function fail(tabQ: string, message: string): never {
+    redirect(`/settings?${tabQ}error=${encodeURIComponent(message)}&t=${Date.now()}`);
 }
 
 export async function saveSettings(formData: FormData) {
+    const tab = String(formData.get("tab") ?? "");
+    const tabQ = TABS.includes(tab) && tab !== "business" ? `tab=${tab}&` : "";
     await requireManager(); // owners/managers only
     const business = await getBusiness();
-    if (!business) fail("Shop not found");
+    if (!business) fail(tabQ, "Shop not found");
 
     // read a text box: trimmed, cut to a max length, empty → null
     const text = (key: string, max: number) => String(formData.get(key) ?? "").trim().slice(0, max) || null;
@@ -27,9 +32,9 @@ export async function saveSettings(formData: FormData) {
     const serviceMode = String(formData.get("service_mode") ?? "cafe");
 
     // check on the server (the browser's checks can be skipped)
-    if (!name) fail("Shop name is required");
-    if (!Number.isFinite(sstRate) || sstRate < 0 || sstRate > 20) fail("SST rate must be between 0 and 20");
-    if (serviceMode !== "cafe" && serviceMode !== "restaurant") fail("Pick a service style");
+    if (!name) fail(tabQ, "Shop name is required");
+    if (!Number.isFinite(sstRate) || sstRate < 0 || sstRate > 20) fail(tabQ, "SST rate must be between 0 and 20");
+    if (serviceMode !== "cafe" && serviceMode !== "restaurant") fail(tabQ, "Pick a service style");
 
     const { error } = await supabaseAdmin
         .from("businesses")
@@ -46,9 +51,9 @@ export async function saveSettings(formData: FormData) {
         })
         .eq("id", business.id);
 
-    if (error) fail(error.message);
+    if (error) fail(tabQ, error.message);
     revalidatePath("/", "layout"); // redraw EVERY page (incl. the top bar in the layout) with the new details
-    redirect(`/settings?saved=1&t=${Date.now()}`); // reload the page with a green "Saved" message
+    redirect(`/settings?${tabQ}saved=1&t=${Date.now()}`); // reload the page with a green "Saved" message
 }
 
 
@@ -56,7 +61,7 @@ export async function saveSettings(formData: FormData) {
 
 // back to the PIN card (#pin) with a red message
 function pinFail(message: string): never {
-    redirect(`/settings?pinError=${encodeURIComponent(message)}&t=${Date.now()}`);
+    redirect(`/settings?tab=security&pinError=${encodeURIComponent(message)}&t=${Date.now()}`);
 }
 
 export async function changePin(formData: FormData) {
@@ -77,5 +82,5 @@ export async function changePin(formData: FormData) {
     if (next !== again) pinFail("The two new PINs are different");
 
     if (!(await setManagerPin(business.id, next))) pinFail("Couldn't save the PIN");
-    redirect(`/settings?pin=changed&t=${Date.now()}`);
+    redirect(`/settings?tab=security&pin=changed&t=${Date.now()}`);
 }

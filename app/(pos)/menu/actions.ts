@@ -183,3 +183,24 @@ export async function setItemGroups(formData: FormData) {
 
     refresh();
 }
+
+// ---------- show / hide on the customer QR menu ----------
+
+export async function toggleShowInApp(formData: FormData) {
+    await requireManager(); // owners/managers only
+    const business = await getBusiness();
+    if (!business) throw new Error("Shop not found");
+
+    const id = Number(formData.get("id"));
+    const shown = formData.get("shown") === "true";
+    if (!Number.isInteger(id)) throw new Error("Bad item id");
+
+    const { error } = await supabaseAdmin
+        .from("menu_items")
+        .update({ show_in_app: !shown })
+        .eq("business_id", business.id)
+        .eq("id", id);
+    if (error) throw new Error(error.message);
+
+    refresh();
+}

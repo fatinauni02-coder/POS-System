@@ -1,5 +1,6 @@
 "use client"; // needs useState for the "are you sure?" step
 
+import { Archive } from "lucide-react";
 import { useState } from "react";
 import { deleteItem } from "./actions";
 
@@ -12,14 +13,19 @@ export function DeleteItemButton({ id, name }: { id: number; name: string }) {
             {sure ? (
                 // second step: Cancel or really delete
                 <div className="grid grid-cols-2 gap-2">
-                    <button type="button" onClick={() => setSure(false)} className="h-11 rounded-xl bg-tint font-semibold">
+                    <button type="button" onClick={() => setSure(false)} className="btn-soft h-12">
                         Cancel
                     </button>
-                    <button className="h-11 truncate rounded-xl bg-red-700 px-2 font-bold text-white">Delete {name}</button>
+                    <button className="press h-12 truncate rounded-xl bg-danger px-2 font-bold text-white">Delete {name}</button>
                 </div>
             ) : (
-                <button type="button" onClick={() => setSure(true)} className="h-11 w-full rounded-xl font-semibold text-red-700 hover:bg-red-50">
-                    Delete
+                <button
+                    type="button"
+                    onClick={() => setSure(true)}
+                    className="press flex h-12 items-center gap-1.5 rounded-xl px-3 font-semibold text-danger hover:bg-danger/10"
+                >
+                    <Archive className="h-4 w-4" />
+                    Delete item
                 </button>
             )}
         </form>

@@ -1,17 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { ArrowLeft, ArrowRight, Banknote, CircleCheck, CreditCard, Delete, QrCode, Wallet, type LucideIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { cashRound, formatRM, toSen } from "@/lib/money";
+import { cashRound, formatRM } from "@/lib/money";
+
+// Look copied from the approved prototype: pos_html/checkout.html + assets/pages/checkout.js
+// (big method tiles, "Cash tendered / Change due" boxes, quick amounts, till-style keypad).
 
 export type Method = "cash" | "card" | "duitnow" | "ewallet";
 
-const METHODS: { id: Method; label: string }[] = [
-    { id: "cash", label: "Cash" },
-    { id: "card", label: "Card" },
-    { id: "duitnow", label: "DuitNow QR" },
-    { id: "ewallet", label: "E-wallet" },
+const METHODS: { id: Method; label: string; Icon: LucideIcon }[] = [
+    { id: "cash", label: "Cash", Icon: Banknote },
+    { id: "card", label: "Card", Icon: CreditCard },
+    { id: "duitnow", label: "DuitNow QR", Icon: QrCode },
+    { id: "ewallet", label: "E-wallet", Icon: Wallet },
 ];
+
+// what the cashier sees for non-cash payments
+const TERMINAL: Record<Exclude<Method, "cash">, { title: string; hint: string }> = {
+    card: { title: "Tap, insert or swipe card", hint: "Wait for the card terminal to show Approved, then confirm." },
+    duitnow: { title: "Customer scans DuitNow QR", hint: "Confirm once the payment notification arrives." },
+    ewallet: { title: "Scan customer's e-wallet", hint: "Touch 'n Go, GrabPay, ShopeePay… Confirm once it shows success." },
+};
+
+// note suggestions: exact, then the next RM10 / RM20 / RM50 / RM100 (no duplicates, max 5)
+function quickAmounts(due: number) {
+    const up = (n: number) => Math.ceil(due / n) * n;
+    return [...new Set([due, up(1000), up(2000), up(5000), up(10000)])].sort((a, b) => a - b).slice(0, 5);
+}
+
+const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"];
+const MAX_SEN = 10_000_00; // RM 10,000 — stops a mistyped "518888"
 
 type Props = {
     total: number; // sen, from the cart (subtotal + SST)
@@ -20,167 +40,179 @@ type Props = {
     onClose: () => void;
 };
 
-// Pop-up: choose how the customer pays; for cash, enter the money received and see the change
+// Pop-up: choose how the customer pays; for cash, key in the money received and see the change
 export function CheckoutPanel({ total, onPay, onClose }: Props) {
     const [method, setMethod] = useState<Method>("cash");
+    const [tendered, setTendered] = useState(0); // cash received, in sen (keypad works like a till: 5 0 0 0 = RM 50.00)
     const [saving, setSaving] = useState(false); // true while waiting for the server
     const [error, setError] = useState(""); // message from the server, if saving failed
-    const [cash, setCash] = useState(""); // what the cashier typed, in RM, e.g. "50"
 
+    const cash = method === "cash";
     // only cash is rounded to 5 sen (cards / QR pay the exact amount)
-    const rounding = method === "cash" ? cashRound(total) : 0;
+    const rounding = cash ? cashRound(total) : 0;
     const payable = total + rounding;
-
-    const tendered = method === "cash" ? toSen(cash) : payable; // money received, in sen
     const change = tendered - payable;
-    const canPay = method !== "cash" || (cash !== "" && change >= 0);
+    const canPay = !cash || change >= 0;
+    const MethodIcon = METHODS.find((m) => m.id === method)!.Icon; // icon of the picked method (for the terminal box)
 
-    // quick buttons: exact amount + notes bigger than the bill (no duplicates)
+    // KEYPAD: digits shift in from the right, like a cash register
+    function press(key: string) {
+        if (key === "C") setTendered(0);
+        else if (key === "⌫") setTendered((t) => Math.floor(t / 10));
+        else setTendered((t) => (t * 10 + Number(key) <= MAX_SEN ? t * 10 + Number(key) : t));
+    }
+
+    // a real keyboard works too: digits, Backspace, Escape = clear
+    useEffect(() => {
+        if (!cash) return;
+        function onKey(e: KeyboardEvent) {
+            if (/^\d$/.test(e.key)) press(e.key);
+            else if (e.key === "Backspace") press("⌫");
+            else if (e.key === "Escape") press("C");
+        }
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [cash]);
+
     async function confirm() {
         setSaving(true);
         setError("");
-        const message = await onPay(method, tendered, payable); // wait for the server
+        const message = await onPay(method, cash ? tendered : payable, payable); // wait for the server
         if (message) {
             setError(message); // failed: show why, let the cashier try again
             setSaving(false);
         }
         // worked: the parent closes this pop-up, nothing more to do here
     }
-    const quick = [payable, 1000, 2000, 5000, 10000].filter((a, i, all) => a >= payable && all.indexOf(a) === i);
-
-    // ON-SCREEN KEYPAD (tablets): each key changes the "Cash received" text
-    function press(key: string) {
-        setCash((c) => {
-            if (key === "⌫") return c.slice(0, -1); // delete the last character
-            if (key === "." && c.includes(".")) return c; // only one dot
-            if (/\.\d{2}$/.test(c)) return c; // already 2 decimals (sen) → ignore more digits
-            if (key !== "." && /^\d{5}$/.test(c)) return c; // max RM 99,999 (stops "518888" by accident)
-            const next = c === "0" && key !== "." ? key : c + key; // no "05"
-            return next === "." ? "0." : next; // "." first → "0."
-        });
-    }
-
-    const isCash = method === "cash";
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-            {/* THE BOX: cash on a wide screen = 2 columns (payment left, keypad right), so it fits without scrolling.
-                Phones / narrow screens: one column, keypad under the cash box. */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4 backdrop-blur-[2px]" onClick={onClose}>
             <div
-                className={`max-h-[95dvh] w-full max-w-md overflow-y-auto rounded-3xl bg-surface p-6 ${isCash ? "md:max-w-3xl" : ""}`}
+                className="no-scrollbar max-h-[95dvh] w-full max-w-md overflow-y-auto rounded-3xl bg-surface p-5 shadow-modal md:max-w-4xl"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className={isCash ? "md:grid md:grid-cols-[1fr_260px] md:gap-6" : ""}>
-                    {/* LEFT COLUMN */}
-                    <div>
-                        <h2 className="text-xl font-bold">Payment</h2>
+                {/* HEADER */}
+                <div className="mb-4 flex items-center gap-3">
+                    <button type="button" onClick={onClose} className="btn-soft flex h-11 items-center gap-2 px-4 text-sm">
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to order
+                    </button>
+                    <h2 className="text-2xl font-bold tracking-tight">Checkout</h2>
+                </div>
 
-                        {/* AMOUNT TO PAY */}
-                        <div className="mt-4 rounded-2xl bg-tint p-4">
-                            {rounding !== 0 && (
-                                <div className="flex justify-between text-sm text-ink-2">
-                                    <span>Total {formatRM(total)} · rounding</span>
-                                    <span>
-                                        {rounding > 0 ? "+" : "−"}
+                {/* 2 columns on wide screens: payment left, cash keys / terminal right */}
+                <div className="grid gap-5 md:grid-cols-2">
+                    {/* LEFT */}
+                    <div className="flex flex-col gap-4">
+                        {/* AMOUNT DUE */}
+                        <div className="flex items-center justify-between rounded-xl bg-tint p-4">
+                            <div>
+                                <p className="label-caps text-ink-2">Total amount due</p>
+                                {rounding !== 0 && (
+                                    <p className="money text-xs text-ink-3">
+                                        {formatRM(total)} · cash rounding {rounding > 0 ? "+" : "−"}
                                         {formatRM(Math.abs(rounding))}
-                                    </span>
-                                </div>
-                            )}
-                            <div className="flex justify-between text-2xl font-bold">
-                                <span>To pay</span>
-                                <span className="text-primary">{formatRM(payable)}</span>
+                                    </p>
+                                )}
+                            </div>
+                            <p className="money text-[34px] font-bold leading-none tracking-tight text-primary">{formatRM(payable)}</p>
+                        </div>
+
+                        {/* PAYMENT METHOD: big tiles, 4 across (2×2 on phones) */}
+                        <div>
+                            <p className="label-caps mb-2 text-ink-2">Payment method</p>
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Payment method">
+                                {METHODS.map(({ id, label, Icon }) => {
+                                    const on = id === method;
+                                    return (
+                                        <button
+                                            key={id}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={on}
+                                            onClick={() => setMethod(id)}
+                                            className={`press relative flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl border-2 text-sm font-semibold ${
+                                                on ? "border-primary-soft bg-tint text-primary" : "border-line hover:bg-tint"
+                                            }`}
+                                        >
+                                            {on && <CircleCheck className="absolute right-2 top-2 h-4 w-4" />}
+                                            <Icon className="h-6 w-6" />
+                                            {label}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
-                        {/* PAYMENT METHOD: 4 equal buttons in one row */}
-                        <div className="mt-4 grid grid-cols-4 gap-2">
-                            {METHODS.map((m) => (
-                                <button
-                                    key={m.id}
-                                    onClick={() => setMethod(m.id)}
-                                    className={`h-12 rounded-xl text-sm font-semibold ${method === m.id ? "bg-primary text-white" : "border border-line bg-surface"}`}
-                                >
-                                    {m.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* CASH ONLY: amount received + quick buttons + change */}
-                        {isCash && (
-                            <div className="mt-4">
-                                <label className="block">
-                                    <span className="text-sm font-semibold text-ink-2">Cash received (RM)</span>
-                                    <input
-                                        value={cash}
-                                        onChange={(e) => setCash(e.target.value)}
-                                        inputMode="none" // touch screens: use the keypad, no phone/tablet keyboard popping up
-                                        autoFocus // a real keyboard still types here
-                                        className="mt-1 h-12 w-full rounded-xl bg-tint px-4 text-lg font-bold outline-none focus:ring-2 focus:ring-primary"
-                                    />
-                                </label>
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                    {quick.map((a) => (
-                                        <button key={a} onClick={() => setCash((a / 100).toFixed(2))} className="h-10 rounded-xl border border-line px-3 font-semibold">
-                                            {a === payable ? "Exact" : formatRM(a)}
-                                        </button>
-                                    ))}
-                                    {cash !== "" && (
-                                        <button onClick={() => setCash("")} className="h-10 rounded-xl px-3 font-semibold text-red-700">
-                                            Clear
-                                        </button>
-                                    )}
+                        {/* CASH: tendered + change boxes */}
+                        {cash && (
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-2xl bg-tint p-4">
+                                    <p className="label-caps text-ink-2">Cash tendered</p>
+                                    <p className="money mt-1 text-[28px] font-bold leading-tight">{formatRM(tendered)}</p>
                                 </div>
-                                {/* KEYPAD here only on narrow screens (md:hidden); wide screens show it on the right */}
-                                <div className="md:hidden">
-                                    <Keypad onPress={press} />
-                                </div>
-                                <div className="mt-3 flex justify-between text-lg font-bold">
-                                    <span>Change</span>
-                                    <span className={change < 0 ? "text-red-700" : "text-green-700"}>
-                                        {cash === "" ? "—" : change < 0 ? `${formatRM(-change)} short` : formatRM(change)}
-                                    </span>
+                                <div className={`rounded-2xl bg-tint-2 p-4 ${change < 0 ? "opacity-50" : ""}`}>
+                                    <p className="label-caps text-primary">Change due</p>
+                                    <p className="money mt-1 text-[28px] font-bold leading-tight text-primary">{change >= 0 ? formatRM(change) : "—"}</p>
                                 </div>
                             </div>
                         )}
 
-                        {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
+                        {error && <p className="rounded-xl bg-danger/10 p-3 text-sm font-semibold text-danger">{error}</p>}
 
-                        <div className="mt-6 grid grid-cols-[1fr_2fr] gap-2">
-                            <button onClick={onClose} className="h-14 rounded-2xl bg-tint font-semibold">
-                                Back
-                            </button>
-                            <button onClick={confirm} disabled={!canPay || saving} className="h-14 rounded-2xl bg-primary font-bold text-white disabled:opacity-40">
-                                {saving ? "Saving…" : "Confirm payment"}
-                            </button>
-                        </div>
+                        {/* COMPLETE (at the bottom of the left column) */}
+                        <button type="button" onClick={confirm} disabled={!canPay || saving} className="btn-primary mt-auto flex h-16 items-center justify-center gap-3 text-xl">
+                            {saving ? "Saving…" : cash && !canPay ? `Enter cash ≥ ${formatRM(payable)}` : `Complete payment · ${formatRM(payable)}`}
+                            {!saving && canPay && <ArrowRight className="h-6 w-6" />}
+                        </button>
                     </div>
 
-                    {/* RIGHT COLUMN (wide screens, cash only): the keypad, full height */}
-                    {isCash && (
-                        <div className="hidden md:flex md:flex-col md:justify-end">
-                            <Keypad onPress={press} big />
+                    {/* RIGHT */}
+                    {cash ? (
+                        <div className="flex flex-col gap-4">
+                            {/* QUICK AMOUNTS */}
+                            <div>
+                                <p className="label-caps mb-2 text-ink-2">Quick amounts</p>
+                                <div className="grid grid-cols-5 gap-2">
+                                    {quickAmounts(payable).map((a, i) => (
+                                        <button
+                                            key={a}
+                                            type="button"
+                                            onClick={() => setTendered(a)}
+                                            className={`press money h-12 rounded-xl text-sm font-bold ${a === tendered ? "bg-primary text-on-primary" : "bg-tint hover:bg-tint-3"}`}
+                                        >
+                                            {i === 0 ? "Exact" : formatRM(a).replace(".00", "")}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* KEYPAD: 1-9, C (clear, red), 0, ⌫ */}
+                            <div className="grid grid-cols-3 gap-2">
+                                {KEYS.map((k) => (
+                                    <button
+                                        key={k}
+                                        type="button"
+                                        onClick={() => press(k)}
+                                        aria-label={k === "⌫" ? "Backspace" : k === "C" ? "Clear amount" : k}
+                                        className={`press h-14 rounded-xl text-2xl font-semibold ${k === "C" ? "bg-tint text-danger" : "bg-tint hover:bg-tint-3"}`}
+                                    >
+                                        {k === "⌫" ? <Delete className="mx-auto h-6 w-6" /> : k}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        // CARD / QR / E-WALLET: what to do on the terminal
+                        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl bg-tint p-8 text-center">
+                            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-surface text-primary">
+                                <MethodIcon className="h-8 w-8" />
+                            </span>
+                            <p className="text-xl font-bold">{TERMINAL[method].title}</p>
+                            <p className="max-w-sm text-ink-2">{TERMINAL[method].hint}</p>
                         </div>
                     )}
                 </div>
             </div>
-        </div>
-    );
-}
-
-// 3 × 4 number keys; big = taller keys for the side column
-function Keypad({ onPress, big = false }: { onPress: (key: string) => void; big?: boolean }) {
-    return (
-        <div className="mt-3 grid grid-cols-3 gap-2">
-            {["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "⌫"].map((k) => (
-                <button
-                    key={k}
-                    onClick={() => onPress(k)}
-                    aria-label={k === "⌫" ? "Delete" : k}
-                    className={`${big ? "h-16" : "h-12"} rounded-xl bg-tint text-xl font-bold active:bg-line`}
-                >
-                    {k}
-                </button>
-            ))}
         </div>
     );
 }
