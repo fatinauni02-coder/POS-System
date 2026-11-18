@@ -42,6 +42,10 @@ const MESSAGES: Record<string, string> = {
     EMPTY_BILL: "There is nothing to pay on this bill.",
     LINE_NOT_FOUND: "That item is no longer on the bill.",
     ALREADY_VOIDED: "That item was already voided.",
+    EMPTY_SPLIT: "Pick at least one item to pay for.",
+    BAD_SPLIT: "The bill changed. Refresh the page and pick the items again.",
+    SAME_TABLE: "The bill is already on that table.",
+    TABLE_BUSY: "That table already has a bill. Pick a free table.",
 };
 
 export async function placeOrder(input: OrderInput): Promise<OrderResult> {
@@ -152,6 +156,70 @@ export async function payBill(input: PayBillInput): Promise<OrderResult> {
         .eq("business_id", business.id)
         .eq("id", data.order_id);
     return { ok: true, orderId: data.order_id, orderNo: data.order_no, change: data.change };
+}
+
+// ---------- restaurant mode: SPLIT BILL — pay some items as their own receipt ----------
+
+export type SplitLine = { lineId: number; qty: number };
+
+// migration 014, pay_split: the picked items move to a NEW paid order (own receipt, own payment);
+// the rest stays on the table. Picking everything left = paying the whole bill.
+// wholeBill = true → the table is free now.
+export async function paySplit(input: PayBillInput & { lines: SplitLine[] }): Promise<OrderResult & { wholeBill?: boolean }> {
+    const business = await getBusiness();
+    if (!business) return { ok: false, message: "Shop not found" };
+    const staff = await getStaff();
+    if (!staff) return { ok: false, message: "Please sign in again." };
+
+    if (input.discountPct > 0 && !isApproved(input.discountToken, `discount:${business.id}:${input.discountPct}`)) {
+        return { ok: false, message: "the discount needs the manager PIN again. Remove it and add it again." };
+    }
+    const lines = input.lines.filter((l) => Number.isInteger(l.lineId) && Number.isInteger(l.qty) && l.qty > 0);
+    if (lines.length === 0) return { ok: false, message: MESSAGES.EMPTY_SPLIT };
+
+    const { data, error } = await supabaseAdmin.rpc("pay_split", {
+        p_business_id: business.id,
+        p_order_id: String(input.orderId),
+        p_lines: lines.map((l) => ({ line_id: l.lineId, qty: l.qty })),
+        p_pay: {
+            method: input.method,
+            tendered: input.tendered,
+            expected_payable: input.expectedPayable,
+            discount_pct: input.discountPct,
+        },
+    });
+    if (error) {
+        console.error("pay_split failed:", error);
+        return { ok: false, message: MESSAGES[error.message] ?? "Couldn't take the payment. Please try again." };
+    }
+    // the cashier = whoever took this payment
+    await supabaseAdmin
+        .from("orders")
+        .update({ staff_id: staff.id, cashier: staff.name })
+        .eq("business_id", business.id)
+        .eq("id", data.order_id);
+    return { ok: true, orderId: data.order_id, orderNo: data.order_no, change: data.change, wholeBill: data.whole_bill === true };
+}
+
+// ---------- restaurant mode: MOVE BILL to another (free) table ----------
+
+// returns an error message, or null if it worked
+export async function moveBill(orderId: number, table: string): Promise<string | null> {
+    const business = await getBusiness();
+    if (!business) return "Shop not found.";
+    if (!(await getStaff())) return "Please sign in again.";
+
+    // migration 014: the target table must be free; QR orders on the bill move with it
+    const { error } = await supabaseAdmin.rpc("move_bill", {
+        p_business_id: business.id,
+        p_order_id: String(orderId),
+        p_table: table,
+    });
+    if (error) {
+        console.error("move_bill failed:", error);
+        return MESSAGES[error.message] ?? "Couldn't move the bill. Please try again.";
+    }
+    return null;
 }
 
 // ---------- restaurant mode: void one sent line (manager PIN) ----------

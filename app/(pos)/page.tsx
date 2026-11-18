@@ -132,7 +132,20 @@ async function loadTable(businessId: string, label: string): Promise<TableInfo |
     .order("id", { referencedTable: "order_items" })
     .maybeSingle();
 
-  return { label: tab.label, bill: toBill(bill) };
+  // free tables (no open bill) → where "Move table" can move this bill to
+  const [{ data: all }, { data: busy }] = await Promise.all([
+    supabase.from("dining_tables").select("label").eq("business_id", businessId).eq("is_active", true).order("sort_order").order("label"),
+    supabaseAdmin.from("orders").select("table_id").eq("business_id", businessId).eq("status", "open").not("table_id", "is", null),
+  ]);
+  const { data: busyLabels } = await supabase
+    .from("dining_tables")
+    .select("label")
+    .eq("business_id", businessId)
+    .in("id", (busy ?? []).map((b) => b.table_id as string));
+  const taken = new Set((busyLabels ?? []).map((t) => t.label));
+  const freeTables = (all ?? []).map((t) => t.label).filter((l) => l !== tab.label && !taken.has(l));
+
+  return { label: tab.label, bill: toBill(bill), freeTables };
 }
 
 // a TAKEAWAY bill opened by an accepted QR order: pay only (no more rounds), then back to the QR board

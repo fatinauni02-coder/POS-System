@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { OptionPicker } from "./option-picker";
 import { formatRM, toSen } from "@/lib/money";
 import { CheckoutPanel, type Method } from "./checkout-panel";
-import { payBill, placeOrder, sendRound } from "./actions";
+import { moveBill, payBill, paySplit, placeOrder, sendRound } from "./actions";
 import { collectQr } from "./qr/actions";
 import Link from "next/link";
 import { DiscountPanel } from "./discount-panel";
@@ -36,6 +36,7 @@ export type TableInfo = {
     backHref?: string; // where "back" goes (default /tables)
     backLabel?: string;
     qrId?: string | null; // takeaway bill from a QR order → "Collected" after paying
+    freeTables?: string[]; // tables with no bill → where "Move table" can go
 };
 
 type Props = { categories: Category[]; items: Item[]; groups: Group[]; sstRate: number; tables: string[]; tableInfo: TableInfo | null };
@@ -77,7 +78,14 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
     const [cart, setCart] = useState<CartLine[]>(() => loadCart(cartKey));
     const [picking, setPicking] = useState<Item | null>(null); // item whose pop-up is open
     const [paying, setPaying] = useState(false); // payment pop-up open?
-    const [done, setDone] = useState<{ orderId: number; orderNo: number; change: number } | null>(null); // last paid order
+    // last paid order; split = only part of the table was paid (the table still has a bill)
+    const [done, setDone] = useState<{ orderId: number; orderNo: number; change: number; split?: boolean } | null>(null);
+    // SPLIT BILL: how many of each sent line this person pays for ({ lineId: qty }); null = not splitting
+    const [split, setSplit] = useState<Record<number, number> | null>(null);
+    // MOVE TABLE pop-up
+    const [moving, setMoving] = useState(false);
+    const [moveError, setMoveError] = useState("");
+    const [moveBusy, setMoveBusy] = useState(false);
     const [discount, setDiscount] = useState<{ pct: number; token: string } | null>(null); // discount applied to the cart
     const [askDiscount, setAskDiscount] = useState(false); // show the "enter manager PIN for discount" pop-up?
     const router = useRouter();
@@ -272,6 +280,41 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
         return null;
     }
 
+    // RESTAURANT MODE: pay only the picked items (split bill) — called by the payment pop-up
+    async function paySplitBill(method: Method, tendered: number, payable: number) {
+        if (!tableInfo?.bill || !split) return "Nothing to pay on this table.";
+        const result = await paySplit({
+            orderId: tableInfo.bill.id,
+            method,
+            tendered,
+            expectedPayable: payable,
+            discountPct: discount?.pct ?? 0,
+            discountToken: discount?.token ?? null,
+            lines: Object.entries(split).map(([lineId, qty]) => ({ lineId: Number(lineId), qty })),
+        });
+        if (!result.ok) return result.message;
+
+        setDiscount(null);
+        setSplit(null);
+        setPaying(false);
+        setShowCart(false);
+        setDone({ orderId: result.orderId, orderNo: result.orderNo, change: result.change, split: !result.wholeBill });
+        router.refresh(); // the bill now shows only what's left
+        return null;
+    }
+
+    // RESTAURANT MODE: move the open bill to a free table, then open that table
+    async function moveTo(label: string) {
+        if (!tableInfo?.bill) return;
+        setMoveBusy(true);
+        setMoveError("");
+        const message = await moveBill(tableInfo.bill.id, label);
+        setMoveBusy(false);
+        if (message) return setMoveError(message);
+        setMoving(false);
+        router.replace(`/?table=${encodeURIComponent(label)}`);
+    }
+
     // already-sent lines grouped by round: [[1, lines], [2, lines]…]
     const rounds = new Map<number, SentLine[]>();
     for (const l of tableInfo?.bill?.lines ?? []) rounds.set(l.round, [...(rounds.get(l.round) ?? []), l]);
@@ -288,6 +331,25 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
     const billDiscount = discount ? Math.round((billSub * discount.pct) / 100) : 0;
     const billSst = Math.round(((billSub - billDiscount) * sstRate) / 100);
     const billTotal = billSub - billDiscount + billSst;
+
+    // SPLIT BILL: the picked part only (same rules: discount, then SST)
+    const splitCount = split ? Object.values(split).reduce((n, q) => n + q, 0) : 0;
+    const splitSub = split
+        ? (tableInfo?.bill?.lines ?? []).reduce((sum, l) => sum + (l.voided ? 0 : Math.round(l.lineSen / l.qty) * (split[l.id] ?? 0)), 0)
+        : 0;
+    const splitDiscount = discount ? Math.round((splitSub * discount.pct) / 100) : 0;
+    const splitSst = Math.round(((splitSub - splitDiscount) * sstRate) / 100);
+    const splitTotal = splitSub - splitDiscount + splitSst;
+    // tap − / + on a line while splitting (0 … how many are on the bill)
+    function pick(line: SentLine, change: number) {
+        setSplit((now) => {
+            const next = { ...(now ?? {}) };
+            const qty = Math.min(line.qty, Math.max(0, (next[line.id] ?? 0) + change));
+            if (qty === 0) delete next[line.id];
+            else next[line.id] = qty;
+            return next;
+        });
+    }
 
 
     // SCREEN SHAPE:
@@ -474,6 +536,11 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                     {/* RESTAURANT MODE: what this table already has, round by round (read-only) */}
                     {tableInfo?.bill && (
                         <div className="rounded-2xl bg-tint p-3">
+                            {split && (
+                                <p className="mb-2 rounded-lg bg-tint-2 p-2 text-xs font-semibold text-primary">
+                                    Split bill: tap + on what this person pays for
+                                </p>
+                            )}
                             <div className="flex justify-between text-sm font-bold">
                                 <span>Already sent</span>
                                 <span>{formatRM(tableInfo.bill.subtotalSen)}</span>
@@ -489,8 +556,22 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                                             </span>
                                             <span className="flex shrink-0 items-baseline">
                                                 {formatRM(l.lineSen)}
-                                                {/* cancel a sent item (manager PIN); already voided → crossed out, no button */}
-                                                {!l.voided && <VoidLineButton lineId={l.id} label={`${l.qty} x ${l.name}`} />}
+                                                {/* splitting: − n + (how many of this line this person pays for);
+                                                    otherwise: cancel a sent item (manager PIN); voided → crossed out, no button */}
+                                                {!l.voided &&
+                                                    (split ? (
+                                                        <span className="ml-2 flex items-center rounded-lg bg-surface">
+                                                            <button onClick={() => pick(l, -1)} disabled={!split[l.id]} aria-label={`One less ${l.name}`} className="h-8 w-8 font-bold text-primary disabled:opacity-30">
+                                                                −
+                                                            </button>
+                                                            <span className="money w-5 text-center font-bold">{split[l.id] ?? 0}</span>
+                                                            <button onClick={() => pick(l, 1)} disabled={(split[l.id] ?? 0) >= l.qty} aria-label={`One more ${l.name}`} className="h-8 w-8 font-bold text-primary disabled:opacity-30">
+                                                                +
+                                                            </button>
+                                                        </span>
+                                                    ) : (
+                                                        <VoidLineButton lineId={l.id} label={`${l.qty} x ${l.name}`} />
+                                                    ))}
                                             </span>
                                         </div>
                                     ))}
@@ -610,6 +691,47 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                                     </button>
                                 </div>
                             </>
+                        ) : split ? (
+                            // SPLIT BILL: totals of the picked items + Pay selected
+                            <>
+                                <div className="flex justify-between text-ink-2">
+                                    <span>Paying for {splitCount} item{splitCount === 1 ? "" : "s"}</span>
+                                    <span>{formatRM(splitSub)}</span>
+                                </div>
+                                {discount ? (
+                                    <div className="flex items-center justify-between text-success">
+                                        <span>
+                                            Discount {discount.pct}%{" "}
+                                            <button onClick={() => setDiscount(null)} className="ml-1 text-sm text-danger underline">
+                                                remove
+                                            </button>
+                                        </span>
+                                        <span>−{formatRM(splitDiscount)}</span>
+                                    </div>
+                                ) : (
+                                    <button onClick={() => setAskDiscount(true)} className="text-sm font-semibold text-primary underline">
+                                        + Add discount
+                                    </button>
+                                )}
+                                {sstRate > 0 && (
+                                    <div className="flex justify-between text-ink-2">
+                                        <span>SST ({sstRate}%)</span>
+                                        <span>{formatRM(splitSst)}</span>
+                                    </div>
+                                )}
+                                <div className="mt-2 flex justify-between text-xl font-bold">
+                                    <span>This person pays</span>
+                                    <span className="text-primary">{formatRM(splitTotal)}</span>
+                                </div>
+                                <div className="mt-4 grid grid-cols-[1fr_2fr] gap-2">
+                                    <button onClick={() => { setSplit(null); setDiscount(null); }} className="btn-soft h-14">
+                                        Cancel
+                                    </button>
+                                    <button onClick={() => setPaying(true)} disabled={splitCount === 0} className="btn-primary h-14">
+                                        Pay {formatRM(splitTotal)}
+                                    </button>
+                                </div>
+                            </>
                         ) : (
                             <>
                                 <div className="flex justify-between text-ink-2">
@@ -644,6 +766,17 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                                 <button onClick={() => setPaying(true)} className="mt-4 h-14 w-full rounded-2xl bg-primary font-bold text-white">
                                     Pay bill {formatRM(billTotal)}
                                 </button>
+                                {/* dine-in tables only: split the bill by items, or move it to another table */}
+                                {tableInfo.canAdd !== false && (
+                                    <div className="mt-2 grid grid-cols-2 gap-2">
+                                        <button onClick={() => { setSplit({}); setDiscount(null); }} className="btn-soft h-11 text-sm">
+                                            Split bill
+                                        </button>
+                                        <button onClick={() => { setMoving(true); setMoveError(""); }} className="btn-soft h-11 text-sm">
+                                            Move table
+                                        </button>
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
@@ -718,8 +851,8 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
             {/* the payment pop-up, only after Charge is tapped */}
             {paying && (
                 <CheckoutPanel
-                    total={tableInfo ? billTotal : total}
-                    onPay={tableInfo ? payTableBill : pay}
+                    total={tableInfo ? (split ? splitTotal : billTotal) : total}
+                    onPay={tableInfo ? (split ? paySplitBill : payTableBill) : pay}
                     onClose={() => setPaying(false)}
                 />
             )}
@@ -773,6 +906,37 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                 </div>
             )}
 
+            {/* MOVE TABLE pop-up: tap a free table → the whole bill moves there */}
+            {moving && tableInfo && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-sm rounded-3xl bg-surface p-6 shadow-modal">
+                        <h2 className="text-xl font-bold">Move Table {tableInfo.label} to…</h2>
+                        <p className="text-sm text-ink-2">The whole bill moves. Only free tables are shown.</p>
+                        {(tableInfo.freeTables ?? []).length === 0 ? (
+                            <p className="mt-4 rounded-xl bg-tint p-4 text-center text-ink-2">No free tables right now</p>
+                        ) : (
+                            <div className="mt-4 grid grid-cols-4 gap-2">
+                                {(tableInfo.freeTables ?? []).map((t) => (
+                                    <button key={t} onClick={() => moveTo(t)} disabled={moveBusy} className="press h-14 rounded-xl border-2 border-dashed border-line font-bold hover:border-primary-soft hover:bg-tint disabled:opacity-40">
+                                        {t}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {moveBusy && (
+                            <p className="mt-3 text-sm text-ink-2">
+                                <Spinner className="mr-1.5 h-4 w-4" />
+                                Moving…
+                            </p>
+                        )}
+                        {moveError && <p className="mt-3 text-sm font-semibold text-danger">{moveError}</p>}
+                        <button onClick={() => setMoving(false)} className="btn-soft mt-4 h-12 w-full">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* "Paid" pop-up after a successful save */}
             {done && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -788,7 +952,12 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                             <Link href={`/receipt/${done.orderId}`} className="flex h-14 items-center justify-center rounded-2xl bg-tint font-semibold">
                                 Receipt
                             </Link>
-                            {tableInfo ? (
+                            {tableInfo && done.split ? (
+                                // split: the rest of the bill is still on this table → stay here
+                                <button onClick={() => setDone(null)} className="h-14 rounded-2xl bg-primary font-bold text-white">
+                                    Continue table {tableInfo.label}
+                                </button>
+                            ) : tableInfo ? (
                                 // restaurant mode: the table is free again → back to the tables
                                 <Link href={tableInfo.backHref ?? "/tables"} className="flex h-14 items-center justify-center rounded-2xl bg-primary font-bold text-white">
                                     Back to {tableInfo.backLabel ?? "Tables"}
