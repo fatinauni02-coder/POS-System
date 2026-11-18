@@ -18,6 +18,21 @@
   --color-ink-2: #574238;     /* secondary text */
   --color-primary-soft: #bd5611; /* active menu item */
 
+  /* more colours from the approved design (pos_html/assets/theme.js) */
+  --color-primary-strong: #783100; /* button pressed / hover */
+  --color-on-primary: #ffffff;     /* text on primary buttons */
+  --color-tint-2: #ffeadf;         /* slightly stronger soft panel */
+  --color-tint-3: #fce3d6;
+  --color-ink-3: #8a7267;          /* muted text */
+  --color-success: #2e7d32;
+  --color-warning: #e68a00;
+  --color-danger: #c62828;
+
+  /* shadows: shadow-card / shadow-panel / shadow-modal */
+  --shadow-card: 0 2px 4px rgba(43, 30, 22, 0.04);
+  --shadow-panel: -4px 0 16px rgba(43, 30, 22, 0.06);
+  --shadow-modal: 0 12px 32px rgba(43, 30, 22, 0.16);
+
   /* LOADING BAR: class "animate-loading-bar" = slide from left to right, repeat */
   --animate-loading-bar: loading-bar 1.2s ease-in-out infinite;
   @keyframes loading-bar {
@@ -44,3 +59,15 @@ body {
 html {
   font-size: 14px;
 }
+
+/* =====================================================================
+   SHARED LOOKS from the approved design (pos_html/assets/theme.js).
+   Use them like normal Tailwind classes: className="card p-4", "btn-primary h-12"…
+   ===================================================================== */
+@utility money { font-variant-numeric: tabular-nums; } /* RM amounts don't jiggle when they change */
+@utility press { transition: all 150ms; &:active:not(:disabled) { transform: scale(0.98); } } /* tiny "push" on tap */
+@utility card { @apply rounded-2xl border border-line bg-surface shadow-card; }
+@utility label-caps { @apply text-[11px] font-bold uppercase tracking-[0.06em]; } /* small capital labels */
+@utility no-scrollbar { scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+@utility btn-primary { @apply press rounded-2xl bg-primary font-bold text-on-primary hover:bg-primary-strong disabled:opacity-40 disabled:hover:bg-primary; }
+@utility btn-soft { @apply press rounded-xl bg-tint font-semibold text-ink-2 hover:bg-tint-3 disabled:opacity-40; }
