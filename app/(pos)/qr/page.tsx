@@ -3,7 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-import { AutoRefresh } from "@/components/auto-refresh";
+import { LiveRefresh } from "@/components/live-refresh";
 import { Loading } from "@/components/loading";
 import { Toast } from "@/components/toast";
 import { getBusiness } from "@/lib/business";
@@ -76,7 +76,8 @@ async function QrBoard({ searchParams }: { searchParams: PageProps<"/qr">["searc
         // full height: header bar, red alert, then the 3 columns fill the rest
         <div className="flex h-full flex-col">
             {/* checks for new phone orders every 10 seconds */}
-            <AutoRefresh seconds={10} />
+            {/* live: new / changed QR orders show up straight away (+ a ding for new ones) */}
+            <LiveRefresh topic={`qr-board:${business.id}`} beepOnNew />
             {typeof params.msg === "string" && <Toast key={String(params.t)} kind="msg" text={params.msg} />}
             {typeof params.error === "string" && <Toast key={String(params.t)} kind="error" text={params.error} />}
 

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-import { AutoRefresh } from "@/components/auto-refresh";
+import { LiveRefresh } from "@/components/live-refresh";
 import { Loading } from "@/components/loading";
 import { formatRM, toSen } from "@/lib/money";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -67,7 +67,8 @@ async function Track({ params }: { params: PageProps<"/order/track/[id]">["param
     return (
         <div className="flex min-h-dvh flex-col px-4 pb-8 pt-4">
             {/* checks again every 5 seconds until the order is finished */}
-            {!finished && <AutoRefresh seconds={5} />}
+            {/* live: the steps move the moment the staff press Accept / Ready */}
+            {!finished && <LiveRefresh topic={`qr-order:${id}`} fallbackSeconds={15} />}
             <p className="text-center text-sm font-semibold text-ink-2">{q.businesses?.name}</p>
 
             {/* ORDER NUMBER CARD */}
