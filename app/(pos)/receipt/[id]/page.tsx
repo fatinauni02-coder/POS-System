@@ -238,12 +238,12 @@ async function Receipt({
                             )}
                             {bar.length > 0 && (
                                 <div className={`doc ${show === "bar" ? "" : "doc-hidden"}`}>
-                                    <Ticket title={"DRINKS" + addOn} orderNo={order.order_no} place={place} when={ticketWhen} lines={bar} refunded={refunded} />
+                                    <Ticket title={"DRINKS" + addOn} orderNo={order.order_no} place={place} when={ticketWhen} lines={bar} refunded={refunded} note={order.note} />
                                 </div>
                             )}
                             {kitchen.length > 0 && (
                                 <div className={`doc ${show === "kitchen" ? "" : "doc-hidden"}`}>
-                                    <Ticket title={"KITCHEN" + addOn} orderNo={order.order_no} place={place} when={ticketWhen} lines={kitchen} refunded={refunded} />
+                                    <Ticket title={"KITCHEN" + addOn} orderNo={order.order_no} place={place} when={ticketWhen} lines={kitchen} refunded={refunded} note={order.note} />
                                 </div>
                             )}
                         </div>
@@ -358,6 +358,7 @@ function Ticket({
     when,
     lines,
     refunded,
+    note,
 }: {
     title: string;
     orderNo: number;
@@ -365,6 +366,7 @@ function Ticket({
     when: string;
     lines: Line[];
     refunded: boolean;
+    note: string | null; // kitchen note for the whole order
 }) {
     return (
         <div className="w-[72mm] bg-white p-1 font-mono leading-snug text-black">
@@ -374,6 +376,8 @@ function Ticket({
             <p className="text-3xl font-bold">#{orderNo}</p>
             <p className="text-lg font-bold">{place}</p>
             <p className="text-[12px]">{when}</p>
+            {/* the note for the WHOLE order: boxed, so the kitchen can't miss it */}
+            {note && <p className="mt-2 border-2 border-black p-1 text-base font-bold">NOTE: {note}</p>}
             <Divider />
             {lines.map((l) => {
                 const { temp, addOns } = splitOptions(l.options);

@@ -19,6 +19,7 @@ export type OrderInput = {
     discountToken: string | null; // approval slip for this discount, or null if no discount
     orderType: "takeaway" | "dine_in";
     table: string | null;
+    note?: string; // kitchen note for the whole order (printed on the tickets)
 };
 
 // What comes back: either it worked (with the order number) or a message to show
@@ -66,6 +67,7 @@ export async function placeOrder(input: OrderInput): Promise<OrderResult> {
             tendered: input.tendered,
             expected_payable: input.expectedPayable,
             discount_pct: input.discountPct,
+            note: (input.note ?? "").trim().slice(0, 200), // create_order saves it in orders.note
             lines: input.lines.map((l) => ({ item_id: l.itemId, qty: l.qty, option_ids: l.optionIds, note: l.note.trim().slice(0, 60) })),
         },
     });
@@ -91,7 +93,7 @@ export type SendResult = { ok: true; orderId: number; orderNo: number; round: nu
 
 // The cart becomes the next round on the table's bill (migration 010, send_round):
 // first send opens the bill; stock is taken now; payment comes later with "Pay bill".
-export async function sendRound(input: { table: string; lines: OrderInput["lines"] }): Promise<SendResult> {
+export async function sendRound(input: { table: string; lines: OrderInput["lines"]; note?: string }): Promise<SendResult> {
     const business = await getBusiness();
     if (!business) return { ok: false, message: "Shop not found" };
     const staff = await getStaff();
@@ -101,6 +103,7 @@ export async function sendRound(input: { table: string; lines: OrderInput["lines
         p_business_id: business.id,
         p_table: input.table.trim().slice(0, 20),
         p_lines: input.lines.map((l) => ({ item_id: l.itemId, qty: l.qty, option_ids: l.optionIds, note: l.note.trim().slice(0, 60) })),
+        p_note: (input.note ?? "").trim().slice(0, 200) || null, // added to the bill's note (010 / 011)
     });
 
     if (error) {

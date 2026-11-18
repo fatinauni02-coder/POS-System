@@ -55,7 +55,7 @@ function loadCart(key: string): CartLine[] {
 }
 
 // a parked order: its cart + takeaway/dine-in + table, and a name to find it again
-type Held = { id: string; label: string; lines: CartLine[]; orderType: "takeaway" | "dine_in"; table: string };
+type Held = { id: string; label: string; lines: CartLine[]; orderType: "takeaway" | "dine_in"; table: string; note?: string };
 const HELD_KEY = "pos.held";
 
 function loadHeld(): Held[] {
@@ -85,6 +85,9 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
     const [table, setTable] = useState("");
     const [showCart, setShowCart] = useState(false);
     const [noteFor, setNoteFor] = useState<string | null>(null);
+    // KITCHEN NOTE for the whole order ("all less sugar", "in a rush") — printed on the tickets
+    const [orderNote, setOrderNote] = useState("");
+    const [editingNote, setEditingNote] = useState(false);
     const [held, setHeld] = useState<Held[]>(loadHeld);
     const [showHeld, setShowHeld] = useState(false);
     const needsTable = orderType === "dine_in" && table.trim() === "";
@@ -179,8 +182,9 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
         if (cart.length === 0) return;
         const time = new Date().toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
         const label = orderType === "dine_in" && table.trim() ? `Table ${table.trim()}` : `Takeaway · ${time}`;
-        setHeld((list) => [...list, { id: String(Date.now()), label, lines: cart, orderType, table }]);
+        setHeld((list) => [...list, { id: String(Date.now()), label, lines: cart, orderType, table, note: orderNote }]);
         setCart([]);
+        setOrderNote("");
         setDiscount(null);
         setTable("");
         setOrderType("takeaway");
@@ -192,6 +196,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
         setCart(h.lines);
         setOrderType(h.orderType);
         setTable(h.table);
+        setOrderNote(h.note ?? "");
         setHeld((list) => list.filter((x) => x.id !== h.id));
         setShowHeld(false);
     }
@@ -211,11 +216,13 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
             discountToken: discount?.token ?? null,
             orderType,
             table: orderType === "dine_in" ? table : null,
+            note: orderNote,
         });
         if (!result.ok) return result.message;
 
         setCart([]); // saved → empty the cart for the next customer
         setDiscount(null); // discount only applies to one order
+        setOrderNote("");
         setTable("");
         setPaying(false);
         setShowCart(false);
@@ -232,6 +239,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
         const result = await sendRound({
             table: tableInfo.label,
             lines: cart.map((l) => ({ itemId: l.itemId, qty: l.qty, optionIds: l.optionIds, note: l.note ?? "" })),
+            note: orderNote,
         });
         setSending(false);
         if (!result.ok) {
@@ -239,6 +247,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
             return;
         }
         setCart([]); // sent → this table's cart is empty again
+        setOrderNote("");
         router.push(`/receipt/${result.orderId}?round=${result.round}`); // the Drinks / Kitchen tickets for this round
     }
 
@@ -545,6 +554,34 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                     ))}
                 </div>
 
+                {/* KITCHEN NOTE for the whole order: a link, then a box; Enter or tapping away closes it */}
+                {cart.length > 0 && (
+                    <div className="border-t border-line px-5 py-3">
+                        {editingNote ? (
+                            <input
+                                autoFocus
+                                value={orderNote}
+                                onChange={(e) => setOrderNote(e.target.value)}
+                                onBlur={() => setEditingNote(false)}
+                                onKeyDown={(e) => e.key === "Enter" && setEditingNote(false)}
+                                maxLength={200}
+                                placeholder="e.g. all less sugar · in a rush"
+                                aria-label="Kitchen note for the whole order"
+                                className="h-11 w-full rounded-xl bg-tint px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-primary-soft"
+                            />
+                        ) : orderNote ? (
+                            <button onClick={() => setEditingNote(true)} className="w-full rounded-xl bg-tint-2 px-3 py-2 text-left text-sm">
+                                <span className="label-caps text-primary">Kitchen note</span>
+                                <span className="block font-semibold italic">{orderNote}</span>
+                            </button>
+                        ) : (
+                            <button onClick={() => setEditingNote(true)} className="text-sm font-semibold text-primary">
+                                + Kitchen note for the whole order
+                            </button>
+                        )}
+                    </div>
+                )}
+
                 {/* RESTAURANT MODE BOTTOM:
                     items in the cart → New round + Clear | Send to kitchen
                     cart empty + a bill → the bill (discount, SST, total) + Pay bill
@@ -559,7 +596,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                                 </div>
                                 {sendError && <p className="mt-2 rounded-xl bg-red-50 p-2 text-sm font-semibold text-red-700">{sendError}</p>}
                                 <div className="mt-4 grid grid-cols-[1fr_2fr] gap-2">
-                                    <button onClick={() => setCart([])} disabled={cart.length === 0 || sending} className="h-14 rounded-2xl bg-tint font-semibold disabled:opacity-40">
+                                    <button onClick={() => { setCart([]); setOrderNote(""); }} disabled={cart.length === 0 || sending} className="h-14 rounded-2xl bg-tint font-semibold disabled:opacity-40">
                                         Clear
                                     </button>
                                     <button onClick={sendToKitchen} disabled={cart.length === 0 || sending} className="h-14 rounded-2xl bg-primary font-bold text-white disabled:opacity-40">
@@ -646,7 +683,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                     {/* BUTTONS: grid-cols-[1fr_2fr] = Clear takes 1 part, Charge 2 parts (Charge is twice as wide)
                         → same width: grid-cols-2. h-14 = button height */}
                     <div className="mt-4 grid grid-cols-[1fr_1fr_2fr] gap-2">
-                        <button onClick={() => { setCart([]); setDiscount(null); }} disabled={cart.length === 0} className="h-14 rounded-2xl bg-tint font-semibold disabled:opacity-40">
+                        <button onClick={() => { setCart([]); setDiscount(null); setOrderNote(""); }} disabled={cart.length === 0} className="h-14 rounded-2xl bg-tint font-semibold disabled:opacity-40">
                             Clear
                         </button>
                         <button onClick={holdOrder} disabled={cart.length === 0} className="h-14 rounded-2xl border border-line font-semibold disabled:opacity-40">
