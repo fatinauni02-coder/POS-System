@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { signIn } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 export default function LoginPage({ searchParams }: PageProps<"/login">) {
     return (
@@ -23,7 +24,7 @@ async function LoginForm({ searchParams }: { searchParams: PageProps<"/login">["
 
             <input name="username" type="text" required autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="Username" className={INPUT} />
             <input name="password" type="password" required autoComplete="current-password" placeholder="Password" className={INPUT} />
-            <button className="h-12 rounded-2xl bg-primary font-bold text-white">Sign in</button>
+            <SubmitButton className="h-12 rounded-2xl bg-primary font-bold text-white">Sign in</SubmitButton>
         </form>
     );
 }

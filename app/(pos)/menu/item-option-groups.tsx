@@ -6,6 +6,7 @@ import { formatRM, toSen } from "@/lib/money";
 import { getBusiness } from "@/lib/business";
 import { supabase } from "@/lib/supabase";
 import { setItemGroups } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 // Tick which option groups this item asks for (e.g. Latte → Temperature + Milk; Croissant → none)
 export async function ItemOptionGroups({ menuItemId }: { menuItemId: number }) {
@@ -61,7 +62,7 @@ export async function ItemOptionGroups({ menuItemId }: { menuItemId: number }) {
       </div>
 
       {(groups ?? []).length > 0 && (
-        <button className="btn-soft mt-3 h-11 w-full">Save option groups</button>
+        <SubmitButton className="btn-soft mt-3 h-11 w-full">Save option groups</SubmitButton>
       )}
     </form>
   );

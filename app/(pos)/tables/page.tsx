@@ -10,6 +10,7 @@ import { formatRM, toSen } from "@/lib/money";
 import { getStaff } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { addTable, deleteTable } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 // "/tables" = restaurant mode: every table, free or with an open bill.
 // Look copied from the approved prototype: pos_html/tables.html + assets/pages/tables.js
@@ -186,7 +187,7 @@ async function Tables({ searchParams }: { searchParams: PageProps<"/tables">["se
                         </div>
                         <form action={addTable} className="flex gap-2">
                             <input name="label" required maxLength={20} placeholder="e.g. 5 or Patio 1" className={`${INPUT} flex-1`} />
-                            <button className="btn-primary h-11 px-5">Add</button>
+                            <SubmitButton className="btn-primary h-11 px-5">Add</SubmitButton>
                         </form>
                         <div className="flex flex-wrap gap-2">
                             {list.map((t) => (
@@ -194,9 +195,9 @@ async function Tables({ searchParams }: { searchParams: PageProps<"/tables">["se
                                     <input type="hidden" name="id" value={t.id} />
                                     <input type="hidden" name="label" value={t.label} />
                                     <span className="font-semibold">{t.label}</span>
-                                    <button aria-label={`Remove table ${t.label}`} className="h-8 w-8 rounded-lg font-bold text-danger hover:bg-surface">
+                                    <SubmitButton replace aria-label={`Remove table ${t.label}`} className="h-8 w-8 rounded-lg font-bold text-danger hover:bg-surface">
                                         ×
-                                    </button>
+                                    </SubmitButton>
                                 </form>
                             ))}
                         </div>

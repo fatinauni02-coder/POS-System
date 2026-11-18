@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { saveItem } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 type Props = {
     item: { id: number | null; name: string; description: string | null; price: number | string; category_id: string | null };
@@ -92,9 +93,9 @@ export function ItemEditor({ item, categories }: Props) {
             </label>
 
             {/* SAVE BUTTON: h-12 = height; faded (opacity-40) and not clickable until name + price are OK */}
-            <button disabled={!canSave} className="btn-primary h-12">
+            <SubmitButton disabled={!canSave} className="btn-primary h-12">
                 {item.id ? "Save changes" : "Add item"}
-            </button>
+            </SubmitButton>
         </form>
     );
 }

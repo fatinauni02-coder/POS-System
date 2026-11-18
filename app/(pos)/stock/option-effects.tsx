@@ -2,6 +2,7 @@ import { getBusiness } from "@/lib/business";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { addOptionEffect, removeOptionEffect } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 const SELECT = "h-11 rounded-xl bg-tint px-2 font-semibold";
 
@@ -55,9 +56,9 @@ export async function OptionEffects() {
                   ? `use ${use?.name} instead of ${instead.name}`
                   : `also use ${Number(e.qty)} ${use?.unit} ${use?.name}`}
               </span>
-              <button aria-label="Remove rule" className="ml-auto px-1 text-lg font-bold text-red-700">
+              <SubmitButton replace aria-label="Remove rule" className="ml-auto px-1 text-lg font-bold text-red-700">
                 ×
-              </button>
+              </SubmitButton>
             </form>
           );
         })}
@@ -101,7 +102,7 @@ export async function OptionEffects() {
             amount (extra)
             <input name="qty" inputMode="decimal" placeholder="e.g. 150" className={`${SELECT} mt-1 px-3`} />
           </label>
-          <button className="h-11 rounded-xl bg-primary px-4 font-bold text-white">Add rule</button>
+          <SubmitButton className="h-11 rounded-xl bg-primary px-4 font-bold text-white">Add rule</SubmitButton>
         </form>
       )}
     </section>

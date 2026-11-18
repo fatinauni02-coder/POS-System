@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Banknote, CircleCheck, CreditCard, Delete, QrCod
 import { useEffect, useState } from "react";
 
 import { cashRound, formatRM } from "@/lib/money";
+import { Spinner } from "@/components/submit-button";
 
 // Look copied from the approved prototype: pos_html/checkout.html + assets/pages/checkout.js
 // (big method tiles, "Cash tendered / Change due" boxes, quick amounts, till-style keypad).
@@ -162,7 +163,7 @@ export function CheckoutPanel({ total, onPay, onClose }: Props) {
 
                         {/* COMPLETE (at the bottom of the left column) */}
                         <button type="button" onClick={confirm} disabled={!canPay || saving} className="btn-primary mt-auto flex h-16 items-center justify-center gap-3 text-xl">
-                            {saving ? "Saving…" : cash && !canPay ? `Enter cash ≥ ${formatRM(payable)}` : `Complete payment · ${formatRM(payable)}`}
+                            {saving ? <><Spinner className="h-5 w-5" /> Saving…</> : cash && !canPay ? `Enter cash ≥ ${formatRM(payable)}` : `Complete payment · ${formatRM(payable)}`}
                             {!saving && canPay && <ArrowRight className="h-6 w-6" />}
                         </button>
                     </div>

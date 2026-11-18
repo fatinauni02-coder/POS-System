@@ -10,6 +10,7 @@ import Link from "next/link";
 import { DiscountPanel } from "./discount-panel";
 import { VoidLineButton } from "./void-line-button";
 import { useRouter } from "next/navigation";
+import { Spinner, SubmitButton } from "@/components/submit-button";
 
 // ---------- TYPES: the shape of the data this screen gets from page.tsx ----------
 // (if you add a column to a Supabase select in page.tsx, add it here too)
@@ -562,7 +563,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                                         Clear
                                     </button>
                                     <button onClick={sendToKitchen} disabled={cart.length === 0 || sending} className="h-14 rounded-2xl bg-primary font-bold text-white disabled:opacity-40">
-                                        {sending ? "Sending…" : `Send to kitchen (${count})`}
+                                        {sending ? <><Spinner className="mr-1.5 h-4 w-4" />Sending…</> : `Send to kitchen (${count})`}
                                     </button>
                                 </div>
                             </>
@@ -758,7 +759,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                             {tableInfo?.qrId && (
                                 <form action={collectQr} className="col-span-2">
                                     <input type="hidden" name="id" value={tableInfo.qrId} />
-                                    <button className="h-14 w-full rounded-2xl bg-green-700 font-bold text-white">Collected ✓</button>
+                                    <SubmitButton className="h-14 w-full rounded-2xl bg-green-700 font-bold text-white">Collected ✓</SubmitButton>
                                 </form>
                             )}
                         </div>

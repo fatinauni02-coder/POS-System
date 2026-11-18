@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { voidLine } from "./actions";
+import { Spinner } from "@/components/submit-button";
 
 // RESTAURANT MODE: cancel one line that was already sent to the kitchen (manager PIN)
 export function VoidLineButton({ lineId, label }: { lineId: number; label: string }) {
@@ -61,7 +62,7 @@ export function VoidLineButton({ lineId, label }: { lineId: number; label: strin
                                 Cancel
                             </button>
                             <button onClick={confirm} disabled={pin.length < 4 || saving} className="h-12 rounded-2xl bg-red-700 font-bold text-white disabled:opacity-40">
-                                {saving ? "Voiding…" : "Void"}
+                                {saving ? <><Spinner className="mr-1.5 h-4 w-4" />Voiding…</> : "Void"}
                             </button>
                         </div>
                     </div>

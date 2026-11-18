@@ -12,6 +12,7 @@ import { getStaff } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { acceptQr, moveQr, setQrOrdering } from "./actions";
 import { RejectButton } from "./reject-button";
+import { SubmitButton } from "@/components/submit-button";
 
 // "/qr" = the staff board for orders customers sent from their phones (QR codes).
 // Look copied from the approved prototype: pos_html/qr-orders.html + assets/pages/qr-orders.js
@@ -92,7 +93,7 @@ async function QrBoard({ searchParams }: { searchParams: PageProps<"/qr">["searc
                 {/* ON / OFF SWITCH (managers can flip it; staff only see it) */}
                 <form action={setQrOrdering}>
                     <input type="hidden" name="on" value={String(!qrOn)} />
-                    <button
+                    <SubmitButton spinner={false}
                         disabled={!isManager}
                         className="flex h-12 items-center gap-3 rounded-xl bg-tint px-4 font-semibold disabled:cursor-default"
                         aria-label={qrOn ? "Pause QR ordering" : "Turn on QR ordering"}
@@ -101,7 +102,7 @@ async function QrBoard({ searchParams }: { searchParams: PageProps<"/qr">["searc
                         <span className={`relative h-7 w-12 rounded-full transition ${qrOn ? "bg-success" : "bg-line"}`}>
                             <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${qrOn ? "left-6" : "left-1"}`} />
                         </span>
-                    </button>
+                    </SubmitButton>
                 </form>
                 {isManager && (
                     <Link href="/tables/qr" className="btn-soft flex h-12 items-center gap-2 px-4">
@@ -201,10 +202,10 @@ function Card({ order: o }: { order: QrRow }) {
                         <RejectButton id={o.id} code={code} />
                         <form action={acceptQr} className="flex flex-1">
                             <input type="hidden" name="id" value={o.id} />
-                            <button className={`btn-primary ${BTN}`}>
+                            <SubmitButton className={`btn-primary ${BTN}`}>
                                 <Check className="h-4 w-4" />
                                 Accept
-                            </button>
+                            </SubmitButton>
                         </form>
                     </>
                 )}
@@ -218,10 +219,10 @@ function Card({ order: o }: { order: QrRow }) {
                         <form action={moveQr} className="flex flex-1">
                             <input type="hidden" name="id" value={o.id} />
                             <input type="hidden" name="status" value="ready" />
-                            <button className={`btn-primary ${BTN}`}>
+                            <SubmitButton className={`btn-primary ${BTN}`}>
                                 <BellRing className="h-4 w-4" />
                                 Mark ready
-                            </button>
+                            </SubmitButton>
                         </form>
                     </>
                 )}
@@ -237,10 +238,10 @@ function Card({ order: o }: { order: QrRow }) {
                         <form action={moveQr} className="flex flex-1">
                             <input type="hidden" name="id" value={o.id} />
                             <input type="hidden" name="status" value="done" />
-                            <button className={`btn-primary ${BTN}`}>
+                            <SubmitButton className={`btn-primary ${BTN}`}>
                                 <CheckCheck className="h-4 w-4" />
                                 {takeaway ? "Collected" : "Served"}
-                            </button>
+                            </SubmitButton>
                         </form>
                     ))}
             </div>

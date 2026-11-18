@@ -1,6 +1,7 @@
 import { getBusiness } from "@/lib/business";
 import { signOut } from "@/app/login/actions";
 import { getStaff } from "@/lib/staff";
+import { SubmitButton } from "@/components/submit-button";
 
 // TOP BAR — server component (async): reads the shop name + tagline from Supabase
 export async function TopBar() {
@@ -31,7 +32,7 @@ export async function TopBar() {
             {staff.name} · {staff.role}
           </span>
           <form action={signOut}>
-            <button className="rounded-full px-3 py-1.5 text-sm font-semibold text-ink-2 hover:bg-tint">Sign out</button>
+            <SubmitButton className="rounded-full px-3 py-1.5 text-sm font-semibold text-ink-2 hover:bg-tint">Sign out</SubmitButton>
           </form>
         </div>
       )}

@@ -7,6 +7,7 @@ import { Toast } from "@/components/toast";
 import { supabase } from "@/lib/supabase";
 import { addGroup, addOption, deleteGroup, removeOption, toggleRequired } from "./actions";
 import { Loading } from "@/components/loading";
+import { SubmitButton } from "@/components/submit-button";
 
 // "/menu/options" = make and edit option groups (Temperature: Hot / Iced, Milk: Fresh / Oat…)
 export default function OptionsPage({ searchParams }: PageProps<"/menu/options">) {
@@ -56,7 +57,7 @@ async function Options({ searchParams }: { searchParams: PageProps<"/menu/option
           <input type="checkbox" name="required" className="h-5 w-5 accent-primary" />
           Must pick one
         </label>
-        <button className="h-11 rounded-xl bg-primary px-5 font-bold text-white">Add group</button>
+        <SubmitButton className="h-11 rounded-xl bg-primary px-5 font-bold text-white">Add group</SubmitButton>
       </form>
 
       {(groups ?? []).length === 0 && <p className="text-center text-ink-2">No option groups yet</p>}
@@ -71,18 +72,18 @@ async function Options({ searchParams }: { searchParams: PageProps<"/menu/option
             <form action={toggleRequired}>
               <input type="hidden" name="id" value={g.id} />
               <input type="hidden" name="required" value={String(g.required)} />
-              <button
+              <SubmitButton spinner={false}
                 className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${g.required ? "bg-primary text-white" : "bg-tint text-ink-2"}`}
                 title="Tap to change"
               >
                 {g.required ? "Must pick one" : "Optional"}
-              </button>
+              </SubmitButton>
             </form>
 
             <form action={deleteGroup}>
               <input type="hidden" name="id" value={g.id} />
               <input type="hidden" name="name" value={g.name} />
-              <button className="text-sm font-semibold text-red-700 underline">Delete group</button>
+              <SubmitButton className="text-sm font-semibold text-red-700 underline">Delete group</SubmitButton>
             </form>
           </div>
 
@@ -95,9 +96,9 @@ async function Options({ searchParams }: { searchParams: PageProps<"/menu/option
                 <input type="hidden" name="name" value={o.name} />
                 <span className="font-semibold">{o.name}</span>
                 {toSen(o.price) > 0 && <span className="text-sm text-ink-2">+{formatRM(toSen(o.price))}</span>}
-                <button aria-label={`Remove ${o.name}`} className="px-2 text-lg font-bold text-red-700">
+                <SubmitButton replace aria-label={`Remove ${o.name}`} className="px-2 text-lg font-bold text-red-700">
                   ×
-                </button>
+                </SubmitButton>
               </form>
             ))}
           </div>
@@ -107,7 +108,7 @@ async function Options({ searchParams }: { searchParams: PageProps<"/menu/option
             <input type="hidden" name="group_id" value={g.id} />
             <input name="name" required maxLength={40} placeholder="New choice, e.g. Less sweet" aria-label={`New choice for ${g.name}`} className={`${INPUT} min-w-0 flex-1`} />
             <input name="price" inputMode="decimal" placeholder="+RM (free)" aria-label={`Extra price for ${g.name}`} className={`${INPUT} w-40`} />
-            <button className="h-11 rounded-xl border-2 border-primary px-4 font-bold text-primary">Add</button>
+            <SubmitButton className="h-11 rounded-xl border-2 border-primary px-4 font-bold text-primary">Add</SubmitButton>
           </form>
         </section>
       ))}

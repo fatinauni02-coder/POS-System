@@ -3,6 +3,7 @@ import { Package, Plus, X } from "lucide-react";
 import { getBusiness } from "@/lib/business";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { removeRecipeLine, saveRecipeLine } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 // A SERVER component that loads its own data: the shop's stock + this item's recipe.
 // (Recipes and stock are private, so they're read with the secret key, here on the server.)
@@ -48,9 +49,9 @@ export async function RecipeEditor({ menuItemId }: { menuItemId: number }) {
                         <span className="money ml-auto font-semibold">
                             {Number(l.qty)} <span className="text-sm text-ink-2">{s?.unit}</span>
                         </span>
-                        <button aria-label={`Remove ${s?.name}`} className="press rounded-lg p-1.5 text-ink-3 hover:bg-danger/10 hover:text-danger">
+                        <SubmitButton replace aria-label={`Remove ${s?.name}`} className="press rounded-lg p-1.5 text-ink-3 hover:bg-danger/10 hover:text-danger">
                             <X className="h-4 w-4" />
-                        </button>
+                        </SubmitButton>
                     </form>
                 );
             })}
@@ -67,10 +68,10 @@ export async function RecipeEditor({ menuItemId }: { menuItemId: number }) {
                         ))}
                     </select>
                     <input name="qty" inputMode="decimal" placeholder="qty" required aria-label="Amount used" className="money h-11 w-20 rounded-xl bg-tint px-3 text-right font-semibold outline-none focus:ring-2 focus:ring-primary-soft" />
-                    <button className="btn-soft flex h-11 items-center gap-1 px-3 text-sm">
+                    <SubmitButton className="btn-soft flex h-11 items-center gap-1 px-3 text-sm">
                         <Plus className="h-4 w-4" />
                         Add
-                    </button>
+                    </SubmitButton>
                 </form>
             )}
         </div>

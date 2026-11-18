@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { DISCOUNTS } from "@/lib/money";
 import { approveDiscount } from "./actions";
+import { Spinner } from "@/components/submit-button";
 
 type Props = {
   onApproved: (pct: number, token: string) => void;
@@ -70,7 +71,7 @@ export function DiscountPanel({ onApproved, onClose }: Props) {
             disabled={pin.length < 4 || saving}
             className="h-12 rounded-2xl bg-primary font-bold text-white disabled:opacity-40"
           >
-            {saving ? "Checking…" : `Give ${pct}% off`}
+            {saving ? <><Spinner className="mr-1.5 h-4 w-4" />Checking…</> : `Give ${pct}% off`}
           </button>
         </div>
       </div>

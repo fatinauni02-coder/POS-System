@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { deleteStockItem } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 export function DeleteStockButton({ name }: { name: string }) {
     const [sure, setSure] = useState(false);
@@ -12,9 +13,9 @@ export function DeleteStockButton({ name }: { name: string }) {
                 Keep
             </button>
             {/* formAction = send THIS form to a different action than the form's own (Save) */}
-            <button formAction={deleteStockItem} className="press h-12 rounded-xl bg-danger px-4 font-bold text-white">
+            <SubmitButton formAction={deleteStockItem} name="do" value="delete" className="press h-12 rounded-xl bg-danger px-4 font-bold text-white">
                 Delete {name}
-            </button>
+            </SubmitButton>
         </>
     ) : (
         <button type="button" onClick={() => setSure(true)} className="press h-12 rounded-xl px-3 font-semibold text-danger hover:bg-danger/10">

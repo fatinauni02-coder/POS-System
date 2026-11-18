@@ -3,6 +3,7 @@
 import { Archive } from "lucide-react";
 import { useState } from "react";
 import { deleteItem } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 export function DeleteItemButton({ id, name }: { id: number; name: string }) {
     const [sure, setSure] = useState(false); // false = first tap not done yet
@@ -16,7 +17,7 @@ export function DeleteItemButton({ id, name }: { id: number; name: string }) {
                     <button type="button" onClick={() => setSure(false)} className="btn-soft h-12">
                         Cancel
                     </button>
-                    <button className="press h-12 truncate rounded-xl bg-danger px-2 font-bold text-white">Delete {name}</button>
+                    <SubmitButton className="press h-12 truncate rounded-xl bg-danger px-2 font-bold text-white">Delete {name}</SubmitButton>
                 </div>
             ) : (
                 <button

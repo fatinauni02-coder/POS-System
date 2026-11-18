@@ -8,6 +8,7 @@ import { displayName } from "@/lib/username";
 import { addStaff, resetPassword, setRole } from "./actions";
 import { RemoveButton } from "./remove-button";
 import { Loading } from "@/components/loading";
+import { SubmitButton } from "@/components/submit-button";
 
 // "/staff" = who can sign in to this shop, and what they may do
 export default function StaffPage({ searchParams }: PageProps<"/staff">) {
@@ -103,7 +104,7 @@ async function Staff({ searchParams }: { searchParams: PageProps<"/staff">["sear
                         className={INPUT}
                     />
                     <RoleSelect roles={canGive} />
-                    <button className="h-11 rounded-xl bg-primary px-5 font-bold text-white">+ Add</button>
+                    <SubmitButton className="h-11 rounded-xl bg-primary px-5 font-bold text-white">+ Add</SubmitButton>
                 </div>
                 <p className="text-sm text-ink-2">
                     Usernames are 3–20 letters or numbers, no spaces. Give them the password yourself.
@@ -136,7 +137,7 @@ async function Staff({ searchParams }: { searchParams: PageProps<"/staff">["sear
                                     <form action={setRole} className="flex gap-2">
                                         <input type="hidden" name="user_id" value={p.id} />
                                         <RoleSelect roles={canGive} value={p.role} small />
-                                        <button className="h-10 rounded-xl bg-tint px-3 text-sm font-semibold">Save role</button>
+                                        <SubmitButton className="h-10 rounded-xl bg-tint px-3 text-sm font-semibold">Save role</SubmitButton>
                                     </form>
                                 )}
                                 <form action={resetPassword} className="flex gap-2">
@@ -150,7 +151,7 @@ async function Staff({ searchParams }: { searchParams: PageProps<"/staff">["sear
                                         autoComplete="new-password"
                                         className="h-10 w-40 rounded-xl bg-tint px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-primary"
                                     />
-                                    <button className="h-10 rounded-xl bg-tint px-3 text-sm font-semibold">Reset password</button>
+                                    <SubmitButton className="h-10 rounded-xl bg-tint px-3 text-sm font-semibold">Reset password</SubmitButton>
                                 </form>
                                 <RemoveButton userId={p.id} name={p.name} />
                             </div>

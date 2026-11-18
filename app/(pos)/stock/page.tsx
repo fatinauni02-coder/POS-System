@@ -9,6 +9,7 @@ import { addStockItem, adjustStock, updateStockItem } from "./actions";
 import { DeleteStockButton } from "./delete-stock-button";
 import { Toast } from "@/components/toast";
 import { Loading } from "@/components/loading";
+import { SubmitButton } from "@/components/submit-button";
 
 // "/stock" — the address remembers what you picked:
 //   ?f=low / out   filter      ?q=milk   search      ?edit=<id> / ?edit=new   the edit pop-up
@@ -229,14 +230,14 @@ async function Stock({ searchParams }: { searchParams: PageProps<"/stock">["sear
                                                     className="money h-11 w-24 rounded-xl bg-tint px-3 text-right font-semibold outline-none focus:ring-2 focus:ring-primary-soft"
                                                 />
                                                 {/* the first button = what Enter presses → Receive */}
-                                                <button name="reason" value="delivery" title="Delivery received" className="btn-soft flex h-11 items-center gap-1 px-3 text-sm text-success!">
+                                                <SubmitButton name="reason" value="delivery" title="Delivery received" className="btn-soft flex h-11 items-center gap-1 px-3 text-sm text-success!">
                                                     <Plus className="h-4 w-4" />
                                                     Receive
-                                                </button>
-                                                <button name="reason" value="waste" title="Spoilt / spilled" className="btn-soft flex h-11 items-center gap-1 px-3 text-sm">
+                                                </SubmitButton>
+                                                <SubmitButton name="reason" value="waste" title="Spoilt / spilled" className="btn-soft flex h-11 items-center gap-1 px-3 text-sm">
                                                     <Minus className="h-4 w-4" />
                                                     Waste
-                                                </button>
+                                                </SubmitButton>
                                                 <Link
                                                     href={`${here}${here.includes("?") ? "&" : "?"}edit=${s.id}`}
                                                     scroll={false}
@@ -317,7 +318,9 @@ async function Stock({ searchParams }: { searchParams: PageProps<"/stock">["sear
                             <Link href={here} scroll={false} className="btn-soft ml-auto flex h-12 items-center px-5">
                                 Cancel
                             </Link>
-                            <button className="btn-primary h-12 px-6">Save</button>
+                            <SubmitButton name="do" value="save" className="btn-primary h-12 px-6">
+                                Save
+                            </SubmitButton>
                         </div>
                     </form>
                 </div>

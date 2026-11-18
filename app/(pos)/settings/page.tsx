@@ -7,6 +7,7 @@ import { Toast } from "@/components/toast";
 import { hasManagerPin } from "@/lib/pin";
 import { changePin, saveSettings } from "./actions";
 import { Loading } from "@/components/loading";
+import { SubmitButton } from "@/components/submit-button";
 
 export default function SettingsPage({ searchParams }: PageProps<"/settings">) {
   return (
@@ -41,13 +42,16 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
   const show = (id: Tab) => (tab === id ? "" : "lg:hidden");
 
   return (
-    <div className="flex flex-col">
+    // THE WHOLE PAGE is the settings form, so the Save buttons (top and bottom) are inside it
+    // and can show a spinner. The PIN has its own little form at the end (form="pin" links its boxes to it).
+    <>
+    <form id="settings" action={saveSettings} className="flex flex-col">
       {params.saved && <Toast key={String(params.t)} kind="msg" text="Saved ✓" />}
       {typeof params.error === "string" && <Toast key={String(params.t)} kind="error" text={params.error} />}
       {params.pin === "changed" && <Toast key={String(params.t)} kind="msg" text="PIN changed ✓" />}
       {typeof params.pinError === "string" && <Toast key={String(params.t)} kind="error" text={params.pinError} />}
 
-      {/* HEADER — the buttons sit outside the form, so form="settings" links them to it */}
+      {/* HEADER */}
       <div className="flex flex-wrap items-center gap-3 border-b border-line bg-surface px-4 py-4 md:px-6">
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-tint text-primary">
           <Settings className="h-6 w-6" />
@@ -66,13 +70,13 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
           // big screens only — phones use the Save bar at the bottom
           <div className="hidden gap-2 lg:flex">
             {/* type="reset" = put every box back to what was saved */}
-            <button type="reset" form="settings" className="btn-soft h-12 px-5">
+            <button type="reset" className="btn-soft h-12 px-5">
               Discard
             </button>
-            <button form="settings" className="btn-primary flex h-12 items-center gap-2 px-6">
+            <SubmitButton className="btn-primary flex h-12 items-center gap-2 px-6">
               <Save className="h-5 w-5" />
               Save settings
-            </button>
+            </SubmitButton>
           </div>
         )}
       </div>
@@ -104,7 +108,7 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
 
         <main className="min-w-0 flex-1">
           {/* THE SETTINGS FORM (one form for every section except the PIN) */}
-          <form id="settings" action={saveSettings} className="flex flex-col gap-4 lg:block">
+          <div className="flex flex-col gap-4 lg:block">
             <input type="hidden" name="tab" value={tab} />
 
             <div className={show("business")}>
@@ -193,41 +197,41 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
                 </div>
               </Section>
             </div>
-          </form>
+          </div>
 
           {/* PHONE SAVE BAR — stays at the bottom while you scroll (sticky); hidden on big screens */}
           <div className="sticky bottom-0 z-10 -mx-4 mt-4 md:-mx-6 flex gap-2 border-t border-line bg-surface p-3 shadow-panel lg:hidden">
-            <button type="reset" form="settings" className="btn-soft h-12 flex-1">
+            <button type="reset" className="btn-soft h-12 flex-1">
               Discard
             </button>
-            <button form="settings" className="btn-primary flex h-12 flex-[2] items-center justify-center gap-2">
+            <SubmitButton className="btn-primary flex h-12 flex-[2] items-center justify-center gap-2">
               <Save className="h-5 w-5" />
               Save settings
-            </button>
+            </SubmitButton>
           </div>
 
-          {/* MANAGER PIN: its own form + its own Server Action */}
-          <form action={changePin} className={`mt-4 lg:mt-0 ${show("security")}`}>
+          {/* MANAGER PIN: its boxes belong to the "pin" form at the end of the page (form="pin") */}
+          <div className={`mt-4 lg:mt-0 ${show("security")}`}>
             <Section title="Manager PIN" desc={hasPin ? "Needed for refunds and discounts. Enter the current PIN to change it." : "No PIN yet — set one here."}>
               <div className="grid gap-4 sm:grid-cols-3">
                 {hasPin && (
                   <Field label="Current PIN">
-                    <input name="current" type="password" inputMode="numeric" maxLength={6} required autoComplete="off" className={INPUT} />
+                    <input form="pin" name="current" type="password" inputMode="numeric" maxLength={6} required autoComplete="off" className={INPUT} />
                   </Field>
                 )}
                 <Field label="New PIN" hint="4 to 6 digits">
-                  <input name="next" type="password" inputMode="numeric" pattern="\d{4,6}" maxLength={6} required autoComplete="new-password" className={INPUT} />
+                  <input form="pin" name="next" type="password" inputMode="numeric" pattern="\d{4,6}" maxLength={6} required autoComplete="new-password" className={INPUT} />
                 </Field>
                 <Field label="New PIN again">
-                  <input name="again" type="password" inputMode="numeric" maxLength={6} required autoComplete="new-password" className={INPUT} />
+                  <input form="pin" name="again" type="password" inputMode="numeric" maxLength={6} required autoComplete="new-password" className={INPUT} />
                 </Field>
               </div>
-              <button className="btn-primary mt-5 flex h-12 w-full items-center justify-center gap-2 px-6 sm:w-auto">
+              <button form="pin" className="btn-primary mt-5 flex h-12 w-full items-center justify-center gap-2 px-6 sm:w-auto">
                 <LockKeyhole className="h-5 w-5" />
                 {hasPin ? "Change PIN" : "Set PIN"}
               </button>
             </Section>
-          </form>
+          </div>
 
           {/* phones / tablets: the Staff page link (big screens have it in the left list) */}
           <Link href="/staff" className="card press mt-4 flex items-center gap-3 p-4 font-semibold lg:hidden">
@@ -242,7 +246,9 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
           </Link>
         </main>
       </div>
-    </div>
+    </form>
+    <form id="pin" action={changePin} />
+    </>
   );
 }
 

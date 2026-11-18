@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { removeStaff } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 // two taps to remove someone (same idea as Delete item on the Menu page)
 export function RemoveButton({ userId, name }: { userId: string; name: string }) {
@@ -15,7 +16,7 @@ export function RemoveButton({ userId, name }: { userId: string; name: string })
                     <button type="button" onClick={() => setSure(false)} className="h-10 rounded-xl bg-tint px-3 text-sm font-semibold">
                         Cancel
                     </button>
-                    <button className="h-10 max-w-48 truncate rounded-xl bg-red-700 px-3 text-sm font-bold text-white">Remove {name}</button>
+                    <SubmitButton className="h-10 max-w-48 truncate rounded-xl bg-red-700 px-3 text-sm font-bold text-white">Remove {name}</SubmitButton>
                 </>
             ) : (
                 <button type="button" onClick={() => setSure(true)} className="h-10 rounded-xl px-3 text-sm font-semibold text-red-700 hover:bg-red-50">

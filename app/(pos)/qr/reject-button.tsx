@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { useState } from "react";
 
 import { rejectQr } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 const REASONS = ["Item sold out", "Kitchen closing", "Please order at the counter"];
 
@@ -27,7 +28,7 @@ export function RejectButton({ id, code }: { id: string; code: string }) {
                                 <form key={r} action={rejectQr}>
                                     <input type="hidden" name="id" value={id} />
                                     <input type="hidden" name="reason" value={r} />
-                                    <button className="btn-soft h-12 w-full px-4 text-left">{r}</button>
+                                    <SubmitButton className="btn-soft h-12 w-full px-4 text-left">{r}</SubmitButton>
                                 </form>
                             ))}
                         </div>

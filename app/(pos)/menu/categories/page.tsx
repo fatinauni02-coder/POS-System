@@ -5,6 +5,7 @@ import { Toast } from "@/components/toast";
 import { supabase } from "@/lib/supabase";
 import { addCategory, deleteCategory, updateCategory } from "./actions";
 import { Loading } from "@/components/loading";
+import { SubmitButton } from "@/components/submit-button";
 
 // "/menu/categories" = manage categories; "?error=…" = show a message from the last save
 export default function CategoriesPage({ searchParams }: PageProps<"/menu/categories">) {
@@ -52,7 +53,7 @@ async function Categories({ searchParams }: { searchParams: PageProps<"/menu/cat
             <form action={addCategory} className="flex gap-2 rounded-2xl border border-line bg-surface p-4">
                 <input name="name" required maxLength={30} placeholder="New category, e.g. Pastries" className={INPUT + " flex-1"} />
                 <StationSelect />
-                <button className="h-11 rounded-xl bg-primary px-5 font-bold text-white">+ Add</button>
+                <SubmitButton className="h-11 rounded-xl bg-primary px-5 font-bold text-white">+ Add</SubmitButton>
             </form>
 
             {/* THE LIST: each row = a rename form + a delete form */}
@@ -70,11 +71,11 @@ async function Categories({ searchParams }: { searchParams: PageProps<"/menu/cat
                                 <span className="w-16 text-center text-sm text-ink-2">
                                     {n} item{n === 1 ? "" : "s"}
                                 </span>
-                                <button className="h-11 rounded-xl bg-tint px-4 font-semibold">Save</button>
+                                <SubmitButton className="h-11 rounded-xl bg-tint px-4 font-semibold">Save</SubmitButton>
                             </form>
                             <form action={deleteCategory}>
                                 <input type="hidden" name="id" value={c.id} />
-                                <button className="h-11 rounded-xl px-3 font-semibold text-red-700 hover:bg-red-50">Delete</button>
+                                <SubmitButton className="h-11 rounded-xl px-3 font-semibold text-red-700 hover:bg-red-50">Delete</SubmitButton>
                             </form>
                         </div>
                     );

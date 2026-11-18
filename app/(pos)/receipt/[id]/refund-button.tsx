@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { refundOrder } from "./actions";
+import { Spinner } from "@/components/submit-button";
 
 // className / children: so Order history can show it in its own style
 type Props = { orderId: number; hasPin: boolean; className?: string; children?: React.ReactNode };
@@ -69,7 +70,7 @@ export function RefundButton({ orderId, hasPin, className, children }: Props) {
                 disabled={pin.length < 4 || saving}
                 className="h-12 rounded-2xl bg-red-700 font-bold text-white disabled:opacity-40"
               >
-                {saving ? "Refunding…" : "Refund"}
+                {saving ? <><Spinner className="mr-1.5 h-4 w-4" />Refunding…</> : "Refund"}
               </button>
             </div>
           </div>

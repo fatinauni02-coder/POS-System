@@ -13,6 +13,7 @@ import { RecipeEditor } from "./recipe-editor";
 import { ItemOptionGroups } from "./item-option-groups";
 import { DeleteItemButton } from "./delete-item-button";
 import { Loading } from "@/components/loading";
+import { SubmitButton } from "@/components/submit-button";
 
 // "/menu" = Menu management. The address remembers what you picked:
 //   ?cat=<id> category   ?s=in / out  stock filter   ?q=latte  search   ?item=12 / ?item=new  the editor
@@ -295,9 +296,9 @@ function Picture({ name, url, grey, big }: { name: string; url: string | null; g
 // ON / OFF switch (a submit button inside its form): green knob right = on
 function Switch({ on, label }: { on: boolean; label: string }) {
     return (
-        <button role="switch" aria-checked={on} aria-label={label} className={`press relative h-8 w-14 shrink-0 rounded-full transition ${on ? "bg-success" : "bg-line"}`}>
+        <SubmitButton spinner={false} role="switch" aria-checked={on} aria-label={label} className={`press relative h-8 w-14 shrink-0 rounded-full transition ${on ? "bg-success" : "bg-line"}`}>
             <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${on ? "left-7" : "left-1"}`} />
-        </button>
+        </SubmitButton>
     );
 }
 
