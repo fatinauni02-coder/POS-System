@@ -79,3 +79,9 @@ html {
   body.print-all .doc-hidden { display: block; }
   body.print-all .doc { break-after: page; }
 }
+
+/* AUTO-PRINT (receipt page ?auto=1): only the picked docs print, each on its own paper */
+@media print {
+  body.print-some .doc { display: none; }
+  body.print-some .doc.print-pick { display: block; break-after: page; }
+}

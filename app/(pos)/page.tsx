@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { OrderScreenClient } from "./order-screen-client";
 import type { TableInfo } from "./order-screen";
 import { Loading } from "@/components/loading";
+import { pinNeeded } from "@/lib/pin";
 
 // "/" = the Order screen (the till)
 // "/?table=5" = restaurant mode: ordering for table 5 (the cart becomes the next round)
@@ -95,6 +96,7 @@ async function OrderContent({ searchParams }: { searchParams: PageProps<"/">["se
       sstRate={sstRate}
       tables={(tables ?? []).map((t) => t.label)}
       tableInfo={tableInfo}
+      pinFor={{ discount: pinNeeded(business.pin_for, "discount"), void: pinNeeded(business.pin_for, "void") }}
     />
   );
 }

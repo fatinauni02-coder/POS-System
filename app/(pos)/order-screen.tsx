@@ -5,12 +5,11 @@ import { OptionPicker } from "./option-picker";
 import { formatRM, toSen } from "@/lib/money";
 import { CheckoutPanel, type Method } from "./checkout-panel";
 import { moveBill, payBill, paySplit, placeOrder, sendRound } from "./actions";
-import { collectQr } from "./qr/actions";
 import Link from "next/link";
 import { DiscountPanel } from "./discount-panel";
 import { VoidLineButton } from "./void-line-button";
 import { useRouter } from "next/navigation";
-import { Spinner, SubmitButton } from "@/components/submit-button";
+import { Spinner } from "@/components/submit-button";
 
 // ---------- TYPES: the shape of the data this screen gets from page.tsx ----------
 // (if you add a column to a Supabase select in page.tsx, add it here too)
@@ -39,7 +38,8 @@ export type TableInfo = {
     freeTables?: string[]; // tables with no bill → where "Move table" can go
 };
 
-type Props = { categories: Category[]; items: Item[]; groups: Group[]; sstRate: number; tables: string[]; tableInfo: TableInfo | null };
+// pinFor: which actions need a manager PIN (Settings) — the server checks again anyway
+type Props = { categories: Category[]; items: Item[]; groups: Group[]; sstRate: number; tables: string[]; tableInfo: TableInfo | null; pinFor: { discount: boolean; void: boolean } };
 const CART_KEY = "pos.cart"; // the name the cart is saved under in the browser
 
 // Reads the saved cart from the browser when the screen opens.
@@ -68,7 +68,7 @@ function loadHeld(): Held[] {
     }
 }
 
-export function OrderScreen({ categories, items, groups, sstRate, tables, tableInfo }: Props) {
+export function OrderScreen({ categories, items, groups, sstRate, tables, tableInfo, pinFor }: Props) {
     // restaurant mode = ordering for a table (cart = next round, "Send to kitchen" instead of "Charge")
     const cartKey = tableInfo ? `${CART_KEY}.table.${tableInfo.label}` : CART_KEY;
 
@@ -78,8 +78,6 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
     const [cart, setCart] = useState<CartLine[]>(() => loadCart(cartKey));
     const [picking, setPicking] = useState<Item | null>(null); // item whose pop-up is open
     const [paying, setPaying] = useState(false); // payment pop-up open?
-    // last paid order; split = only part of the table was paid (the table still has a bill)
-    const [done, setDone] = useState<{ orderId: number; orderNo: number; change: number; split?: boolean } | null>(null);
     // SPLIT BILL: how many of each sent line this person pays for ({ lineId: qty }); null = not splitting
     const [split, setSplit] = useState<Record<number, number> | null>(null);
     // MOVE TABLE pop-up
@@ -234,8 +232,8 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
         setTable("");
         setPaying(false);
         setShowCart(false);
-        setDone({ orderId: result.orderId, orderNo: result.orderNo, change: result.change });
-        router.refresh();
+        // straight to the receipt page; ?auto=1 = print by itself (Settings → Printing)
+        router.push(`/receipt/${result.orderId}?auto=1`);
         return null;
     }
 
@@ -256,7 +254,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
         }
         setCart([]); // sent → this table's cart is empty again
         setOrderNote("");
-        router.push(`/receipt/${result.orderId}?round=${result.round}`); // the Drinks / Kitchen tickets for this round
+        router.push(`/receipt/${result.orderId}?round=${result.round}&auto=1`); // the Drinks / Kitchen tickets for this round
     }
 
     // RESTAURANT MODE: pay the whole table bill (all rounds) — called by the payment pop-up
@@ -275,8 +273,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
         setDiscount(null);
         setPaying(false);
         setShowCart(false);
-        setDone({ orderId: result.orderId, orderNo: result.orderNo, change: result.change });
-        router.refresh(); // the table is free now → the screen reloads without the bill
+        router.push(`/receipt/${result.orderId}?auto=1`); // receipt page (prints by itself); the table is free now
         return null;
     }
 
@@ -298,8 +295,8 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
         setSplit(null);
         setPaying(false);
         setShowCart(false);
-        setDone({ orderId: result.orderId, orderNo: result.orderNo, change: result.change, split: !result.wholeBill });
-        router.refresh(); // the bill now shows only what's left
+        // this person's receipt (prints by itself); its "Back to Table" button returns to the rest of the bill
+        router.push(`/receipt/${result.orderId}?auto=1`);
         return null;
     }
 
@@ -570,7 +567,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                                                             </button>
                                                         </span>
                                                     ) : (
-                                                        <VoidLineButton lineId={l.id} label={`${l.qty} x ${l.name}`} />
+                                                        <VoidLineButton lineId={l.id} label={`${l.qty} x ${l.name}`} needPin={pinFor.void} />
                                                     ))}
                                             </span>
                                         </div>
@@ -860,6 +857,7 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
             {/* the discount pop-up */}
             {askDiscount && (
                 <DiscountPanel
+                    needPin={pinFor.discount}
                     onApproved={(pct, token) => {
                         setDiscount({ pct, token });
                         setAskDiscount(false);
@@ -937,47 +935,6 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                 </div>
             )}
 
-            {/* "Paid" pop-up after a successful save */}
-            {done && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                    <div className="w-full max-w-sm rounded-3xl bg-surface p-6 text-center">
-                        <p className="text-sm font-semibold text-green-700">Payment received</p>
-                        <h2 className="mt-1 text-3xl font-bold">Order #{done.orderNo}</h2>
-                        {done.change > 0 && (
-                            <p className="mt-2 text-lg">
-                                Change: <b>{formatRM(done.change)}</b>
-                            </p>
-                        )}
-                        <div className="mt-6 grid grid-cols-2 gap-2">
-                            <Link href={`/receipt/${done.orderId}`} className="flex h-14 items-center justify-center rounded-2xl bg-tint font-semibold">
-                                Receipt
-                            </Link>
-                            {tableInfo && done.split ? (
-                                // split: the rest of the bill is still on this table → stay here
-                                <button onClick={() => setDone(null)} className="h-14 rounded-2xl bg-primary font-bold text-white">
-                                    Continue table {tableInfo.label}
-                                </button>
-                            ) : tableInfo ? (
-                                // restaurant mode: the table is free again → back to the tables
-                                <Link href={tableInfo.backHref ?? "/tables"} className="flex h-14 items-center justify-center rounded-2xl bg-primary font-bold text-white">
-                                    Back to {tableInfo.backLabel ?? "Tables"}
-                                </Link>
-                            ) : (
-                                <button onClick={() => setDone(null)} className="h-14 rounded-2xl bg-primary font-bold text-white">
-                                    Next customer
-                                </button>
-                            )}
-                            {/* QR takeaway: paid AND handed over in one go → marks the phone order Done, back to the board */}
-                            {tableInfo?.qrId && (
-                                <form action={collectQr} className="col-span-2">
-                                    <input type="hidden" name="id" value={tableInfo.qrId} />
-                                    <SubmitButton className="h-14 w-full rounded-2xl bg-green-700 font-bold text-white">Collected ✓</SubmitButton>
-                                </form>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

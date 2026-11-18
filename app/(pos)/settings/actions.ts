@@ -7,9 +7,10 @@ import { checkOwnPin, hasOwnPin, setOwnPin } from "@/lib/pin";
 import { getBusiness } from "@/lib/business";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireManager } from "@/lib/staff";
+import { HEX, THEME_PRESETS } from "@/lib/theme";
 
 // which section was open ("?tab=…"), so we go back to the same one
-const TABS = ["business", "tax", "receipt", "service"];
+const TABS = ["business", "appearance", "tax", "receipt", "service", "security"];
 
 // go back to /settings (same section) with a red message
 function fail(tabQ: string, message: string): never {
@@ -36,6 +37,18 @@ export async function saveSettings(formData: FormData) {
     if (!Number.isFinite(sstRate) || sstRate < 0 || sstRate > 20) fail(tabQ, "SST rate must be between 0 and 20");
     if (serviceMode !== "cafe" && serviceMode !== "restaurant") fail(tabQ, "Pick a service style");
 
+    // APPEARANCE: 4 colours (#rrggbb) + which preset (or "custom")
+    const colour = (key: string) => String(formData.get(`theme_${key}`) ?? "").toLowerCase();
+    const theme = {
+        preset: String(formData.get("theme_preset") ?? "custom"),
+        primary: colour("primary"),
+        background: colour("background"),
+        surface: colour("surface"),
+        text: colour("text"),
+    };
+    if (![theme.primary, theme.background, theme.surface, theme.text].every((c) => HEX.test(c))) fail(tabQ, "A colour isn't a valid #RRGGBB code");
+    if (!(theme.preset in THEME_PRESETS)) theme.preset = "custom";
+
     const { error } = await supabaseAdmin
         .from("businesses")
         .update({
@@ -48,6 +61,19 @@ export async function saveSettings(formData: FormData) {
             sst_reg_no: text("sst_reg_no", 40),
             receipt_footer: text("receipt_footer", 200),
             service_mode: serviceMode,
+            theme,
+            // what prints by itself after Pay / Send to kitchen (ticked box = "on")
+            // which actions need a manager PIN (ticked = PIN needed)
+            pin_for: {
+                discount: formData.get("pin_discount") === "on",
+                refund: formData.get("pin_refund") === "on",
+                void: formData.get("pin_void") === "on",
+            },
+            auto_print: {
+                receipt: formData.get("auto_receipt") === "on",
+                bar: formData.get("auto_bar") === "on",
+                kitchen: formData.get("auto_kitchen") === "on",
+            },
         })
         .eq("id", business.id);
 
@@ -83,4 +109,50 @@ export async function changePin(formData: FormData) {
     const problem = await setOwnPin(business.id, me.id, next);
     if (problem) pinFail(problem);
     redirect(`/settings?tab=security&pin=changed&t=${Date.now()}`);
+}
+
+// ---------- shop logo (Storage bucket "menu-photos", migration 013) ----------
+
+const BUCKET = "menu-photos";
+
+// delete a logo file — only if it's one of OUR uploads
+async function deleteStored(url: string | null) {
+    const marker = `/storage/v1/object/public/${BUCKET}/`;
+    if (!url || !url.includes(marker)) return;
+    await supabaseAdmin.storage.from(BUCKET).remove([decodeURIComponent(url.split(marker)[1])]);
+}
+
+// returns an error message, or null
+export async function uploadLogo(formData: FormData): Promise<string | null> {
+    await requireManager();
+    const business = await getBusiness();
+    if (!business) return "Shop not found";
+
+    const file = formData.get("logo");
+    if (!(file instanceof File) || file.size === 0) return "Pick a picture first";
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) return "Use a PNG, JPG or WebP picture";
+    if (file.size > 1024 * 1024) return "Logo is too big (max 1 MB)";
+
+    const path = `${business.id}/logo-${Date.now()}.png`;
+    const { error: upError } = await supabaseAdmin.storage.from(BUCKET).upload(path, file, { contentType: file.type, cacheControl: "31536000" });
+    if (upError) {
+        console.error("logo upload failed:", upError);
+        return "Couldn't upload the logo. Did you run migration 013?";
+    }
+    const url = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    const { error } = await supabaseAdmin.from("businesses").update({ logo_url: url }).eq("id", business.id);
+    if (error) return error.message;
+
+    await deleteStored((business.logo_url as string | null) ?? null);
+    revalidatePath("/", "layout"); // every page shows the new logo
+    return null;
+}
+
+export async function removeLogo() {
+    await requireManager();
+    const business = await getBusiness();
+    if (!business) return;
+    await supabaseAdmin.from("businesses").update({ logo_url: null }).eq("id", business.id);
+    await deleteStored((business.logo_url as string | null) ?? null);
+    revalidatePath("/", "layout");
 }

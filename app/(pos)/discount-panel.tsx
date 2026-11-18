@@ -9,10 +9,11 @@ import { Spinner } from "@/components/submit-button";
 type Props = {
   onApproved: (pct: number, token: string) => void;
   onClose: () => void;
+  needPin: boolean; // false = the shop turned the PIN off for discounts (Settings)
 };
 
 // Pop-up: pick 10 / 20 / 50 %, manager types the PIN, server approves
-export function DiscountPanel({ onApproved, onClose }: Props) {
+export function DiscountPanel({ onApproved, onClose, needPin }: Props) {
   const [pct, setPct] = useState(DISCOUNTS[0]);
   const [pin, setPin] = useState("");
   const [saving, setSaving] = useState(false);
@@ -49,6 +50,7 @@ export function DiscountPanel({ onApproved, onClose }: Props) {
           ))}
         </div>
 
+        {needPin ? (
         <input
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
@@ -59,6 +61,9 @@ export function DiscountPanel({ onApproved, onClose }: Props) {
           placeholder="Manager PIN"
           className="mt-4 h-14 w-full rounded-xl bg-tint px-4 text-center text-2xl tracking-[0.5em] outline-none placeholder:text-base placeholder:tracking-normal focus:ring-2 focus:ring-primary"
         />
+        ) : (
+          <p className="mt-4 text-sm text-ink-2">No PIN needed (turned off in Settings). Your name is saved as who gave it.</p>
+        )}
 
         {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
 
@@ -68,7 +73,7 @@ export function DiscountPanel({ onApproved, onClose }: Props) {
           </button>
           <button
             onClick={approve}
-            disabled={pin.length < 4 || saving}
+            disabled={(needPin && pin.length < 4) || saving}
             className="h-12 rounded-2xl bg-primary font-bold text-white disabled:opacity-40"
           >
             {saving ? <><Spinner className="mr-1.5 h-4 w-4" />Checking…</> : `Give ${pct}% off`}

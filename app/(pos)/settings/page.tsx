@@ -1,14 +1,17 @@
-import { Armchair, ChevronRight, Users, Check, CircleCheck, Coffee, LayoutGrid, Lock, LockKeyhole, Percent, Receipt, Save, Settings, Store } from "lucide-react";
+import { Armchair, Palette, ChevronRight, Users, Check, CircleCheck, Coffee, LayoutGrid, Lock, LockKeyhole, Percent, Receipt, Save, Settings, Store } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
 import { getBusiness } from "@/lib/business";
 import { Toast } from "@/components/toast";
-import { hasOwnPin } from "@/lib/pin";
+import { hasOwnPin, pinNeeded } from "@/lib/pin";
 import { getStaff } from "@/lib/staff";
 import { changePin, saveSettings } from "./actions";
 import { Loading } from "@/components/loading";
 import { SubmitButton } from "@/components/submit-button";
+import { readTheme } from "@/lib/theme";
+import { LogoUpload } from "./logo-upload";
+import { ThemeEditor } from "./theme-editor";
 
 export default function SettingsPage({ searchParams }: PageProps<"/settings">) {
   return (
@@ -21,8 +24,9 @@ export default function SettingsPage({ searchParams }: PageProps<"/settings">) {
 // the sections on the left; "?tab=tax" = which one is open
 const TABS = [
   { id: "business", label: "Business profile", Icon: Store },
+  { id: "appearance", label: "Appearance", Icon: Palette },
   { id: "tax", label: "Tax (SST)", Icon: Percent },
-  { id: "receipt", label: "Receipt", Icon: Receipt },
+  { id: "receipt", label: "Receipt & printing", Icon: Receipt },
   { id: "service", label: "Service style", Icon: Armchair },
   { id: "security", label: "Manager PIN", Icon: LockKeyhole },
 ] as const;
@@ -36,6 +40,7 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
   const tab: Tab = TABS.some((t) => t.id === params.tab) ? (params.tab as Tab) : "business";
   const business = await getBusiness();
   if (!business) return <p className="p-6 text-danger">Shop not found</p>;
+  const auto = (business.auto_print ?? {}) as { receipt?: boolean; bar?: boolean; kitchen?: boolean };
   const me = await getStaff();
   const hasPin = me ? await hasOwnPin(business.id, me.id) : false; // MY OWN PIN (each manager has one)
 
@@ -68,8 +73,7 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
           </h1>
           <p className="hidden text-sm text-ink-2 sm:block">Business details, tax, receipt and service style</p>
         </div>
-        {tab !== "security" && (
-          // big screens only — phones use the Save bar at the bottom
+        {/* big screens only — phones use the Save bar at the bottom */}
           <div className="hidden gap-2 lg:flex">
             {/* type="reset" = put every box back to what was saved */}
             <button type="reset" className="btn-soft h-12 px-5">
@@ -80,7 +84,6 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
               Save settings
             </SubmitButton>
           </div>
-        )}
       </div>
 
       <div className="flex flex-col gap-4 p-4 md:p-6 lg:flex-row lg:gap-5">
@@ -115,6 +118,11 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
 
             <div className={show("business")}>
               <Section title="Business profile" desc="Shown in the top bar and on every receipt.">
+                {/* LOGO: uploads straight away (its own buttons, not "Save settings") */}
+                <div className="mb-6 border-b border-line pb-6">
+                  <p className="mb-2 text-sm font-semibold text-ink-2">Logo</p>
+                  <LogoUpload url={(business.logo_url as string | null) ?? null} initial={business.name.charAt(0).toUpperCase()} />
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Business name">
                     <input name="name" defaultValue={business.name} required maxLength={60} className={INPUT} />
@@ -131,6 +139,12 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
                     <input name="phone" type="tel" defaultValue={business.phone ?? ""} maxLength={30} className={INPUT} />
                   </Field>
                 </div>
+              </Section>
+            </div>
+
+            <div className={show("appearance")}>
+              <Section title="Appearance" desc="Your brand colours. Everything else (soft tints, borders, button text) is worked out from these 4.">
+                <ThemeEditor initial={readTheme(business.theme)} shopName={business.name} logoUrl={(business.logo_url as string | null) ?? null} />
               </Section>
             </div>
 
@@ -164,7 +178,7 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
             </div>
 
             <div className={show("receipt")}>
-              <Section title="Receipt" desc="What prints on the 80mm receipt.">
+              <Section title="Receipt & printing" desc="What prints on the 80mm receipt, and what prints by itself.">
                 <Field label="Footer message" hint="Printed above “Thank you!”">
                   <input
                     name="receipt_footer"
@@ -174,6 +188,15 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
                     className={INPUT}
                   />
                 </Field>
+                <p className="label-caps mt-6 mb-2 text-ink-2">Print by itself</p>
+                <div className="space-y-2">
+                  <SwitchRow name="auto_receipt" on={auto.receipt !== false} title="Customer receipt" desc="After payment, the receipt page opens and prints." />
+                  <SwitchRow name="auto_bar" on={auto.bar !== false} title="Drinks ticket" desc="For the bar — when a cafe order is paid, or a round is sent to the kitchen." />
+                  <SwitchRow name="auto_kitchen" on={auto.kitchen !== false} title="Kitchen ticket" desc="For the kitchen — same times as the drinks ticket." />
+                </div>
+                <p className="mt-2 text-xs text-ink-3">
+                  The browser still shows its print box. To print with no box, start Chrome on the till with <code>--kiosk-printing</code>.
+                </p>
               </Section>
             </div>
 
@@ -233,6 +256,17 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
                 {hasPin ? "Change PIN" : "Set PIN"}
               </button>
             </Section>
+
+            {/* WHICH ACTIONS NEED A PIN — part of the settings form (Save settings), not the PIN form */}
+            <div className="mt-4">
+              <Section title="Ask for a manager PIN to…" desc="Turned off = anyone signed in can do it; their name is saved as who did it.">
+                <div className="space-y-2">
+                  <SwitchRow name="pin_discount" on={pinNeeded(business.pin_for, "discount")} title="Give a discount" desc="10 / 20 / 50 % off an order or a bill." />
+                  <SwitchRow name="pin_refund" on={pinNeeded(business.pin_for, "refund")} title="Refund an order" desc="From the receipt page or Order history." />
+                  <SwitchRow name="pin_void" on={pinNeeded(business.pin_for, "void")} title="Void a sent item" desc="Restaurant mode: take an item off a table bill." />
+                </div>
+              </Section>
+            </div>
           </div>
 
           {/* phones / tablets: the Staff page link (big screens have it in the left list) */}

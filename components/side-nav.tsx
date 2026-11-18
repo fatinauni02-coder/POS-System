@@ -35,9 +35,11 @@ export type NavProps = {
   isRestaurant: boolean;
   newQr: number; // phone orders waiting → red number on "QR"
   lowStock: number; // stock items low or out → amber number on "Stock" (managers only)
+  logoUrl?: string | null; // the shop's logo (Settings → Appearance)
+  initial?: string; // first letter of the shop name, when there's no logo
 };
 
-export function SideNav({ isManager, isRestaurant, newQr, lowStock }: NavProps) {
+export function SideNav({ isManager, isRestaurant, newQr, lowStock, logoUrl, initial = "K" }: NavProps) {
   const path = usePathname(); // the current address, e.g. "/menu"
 
   return (
@@ -49,8 +51,13 @@ export function SideNav({ isManager, isRestaurant, newQr, lowStock }: NavProps) 
     // py-4       = space at the top and bottom
     <aside className="hidden md:flex w-[68px] print:hidden shrink-0 flex-col items-center gap-2 border-r border-line bg-surface py-4">
       {/* LOGO: h-11 w-11 = square size, rounded-xl = corner roundness, mb-3 = gap under it */}
-      <Link href="/" className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-lg font-bold text-white">
-        K
+      <Link href="/" className="mb-3 flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-primary text-lg font-bold text-on-primary">
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- logo from Supabase Storage
+          <img src={logoUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          initial
+        )}
       </Link>
       
 

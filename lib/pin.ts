@@ -131,3 +131,21 @@ export async function setOwnPin(businessId: string, userId: string, pin: string)
 export async function clearOwnPin(businessId: string, userId: string) {
     await supabaseAdmin.from("member_pins").delete().eq("business_id", businessId).eq("user_id", userId);
 }
+
+// ---------- which actions need a PIN (Settings → Manager PIN → "Ask for a PIN to") ----------
+
+export type PinAction = "discount" | "refund" | "void";
+
+// businesses.pin_for = { discount: true, refund: true, void: true }; missing = true (safe default)
+export function pinNeeded(pinFor: unknown, action: PinAction) {
+    const rules = (pinFor ?? {}) as Partial<Record<PinAction, boolean>>;
+    return rules[action] !== false;
+}
+
+// one check for discount / refund / void: the PIN if this shop asks for one,
+// otherwise just the signed-in person (who is then saved as "approved by").
+export async function approve(business: { id: string; pin_for?: unknown }, action: PinAction, pin: string, staffName: string): Promise<PinCheck> {
+    if (!pinNeeded(business.pin_for, action)) return { ok: true, by: staffName };
+    if (!/^\d{4,6}$/.test(pin)) return { ok: false, message: "The PIN is 4 to 6 digits." };
+    return checkManagerPin(business.id, pin);
+}

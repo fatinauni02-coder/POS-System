@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { BottomNavForStaff, SideNavForStaff } from "@/components/role-navs";
 import { TopBar } from "@/components/top-bar";
+import { ThemeStyle } from "@/components/theme-style";
 
 // STAFF LAYOUT — wraps every page in the (pos) folder (Order, Tables, Menu, Stock…).
 // A folder name in (brackets) is a "route group": it groups files but is NOT part of the address,
@@ -17,6 +18,10 @@ export default function PosLayout({ children }: { children: React.ReactNode }) {
     // flex = SideNav and the right column side by side (a row)
     // h-dvh = exactly the screen height (dvh also works on tablets with browser bars)
     <div className="flex h-dvh">
+      {/* the shop's colours (Settings → Appearance) */}
+      <Suspense fallback={null}>
+        <ThemeStyle />
+      </Suspense>
       {/* SideNav reads the address (usePathname), which only exists when a page is asked for */}
       <Suspense fallback={<aside className="hidden md:block w-[68px] shrink-0 border-r border-line bg-surface print:hidden" />}>
         <SideNavForStaff />

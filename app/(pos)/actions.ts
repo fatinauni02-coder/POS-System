@@ -3,7 +3,7 @@
 import { getBusiness } from "@/lib/business";
 import { discountApprovedBy, makeDiscountApproval } from "@/lib/approval";
 import { DISCOUNTS } from "@/lib/money";
-import { checkManagerPin } from "@/lib/pin";
+import { approve } from "@/lib/pin";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getStaff } from "@/lib/staff"
 import { refresh } from "next/cache";
@@ -232,15 +232,13 @@ export async function moveBill(orderId: number, table: string): Promise<string |
 
 // returns an error message, or null if it worked
 export async function voidLine(lineId: number, pin: string, restock: boolean): Promise<string | null> {
-    if (!/^\d{4,6}$/.test(pin)) return "The PIN is 4 to 6 digits.";
-
     const business = await getBusiness();
     if (!business) return "Shop not found.";
     const staff = await getStaff();
     if (!staff) return "Please sign in again.";
 
-    // checked HERE on the server — the browser can't skip it
-    const check = await checkManagerPin(business.id, pin);
+    // checked HERE on the server — the browser can't skip it (unless the shop turned the PIN off for voids)
+    const check = await approve(business, "void", pin, staff.name);
     if (!check.ok) return check.message;
 
     // migration 010: marks the line voided, puts its stock back (if asked), updates the bill;
@@ -271,9 +269,11 @@ export async function approveDiscount(pct: number, pin: string): Promise<Discoun
 
     const business = await getBusiness();
     if (!business) return { ok: false, message: "Shop not found" };
-    if (!(await getStaff())) return { ok: false, message: "Please sign in again." };
+    const staff = await getStaff();
+    if (!staff) return { ok: false, message: "Please sign in again." };
 
-    const check = await checkManagerPin(business.id, pin);
+    // the PIN (or, if the shop turned it off for discounts, just whoever is signed in)
+    const check = await approve(business, "discount", pin, staff.name);
     if (!check.ok) return { ok: false, message: check.message };
 
     // the slip remembers WHO approved (saved on the order when it's paid)

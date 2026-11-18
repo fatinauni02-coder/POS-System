@@ -10,7 +10,7 @@ import { SideNav } from "./side-nav";
 const navInfo = cache(async () => {
     const [staff, business] = await Promise.all([getStaff(), getBusiness()]);
     const isManager = staff !== null && staff.role !== "staff";
-    if (!staff || !business) return { isManager, isRestaurant: false, newQr: 0, lowStock: 0 };
+    if (!staff || !business) return { isManager, isRestaurant: false, newQr: 0, lowStock: 0, logoUrl: null, initial: "K" };
 
     const [{ count }, { data: stock }] = await Promise.all([
         // phone orders waiting for staff
@@ -28,6 +28,8 @@ const navInfo = cache(async () => {
         isRestaurant: business.service_mode === "restaurant",
         newQr: count ?? 0,
         lowStock,
+        logoUrl: (business.logo_url as string | null) ?? null, // Settings → Appearance → Logo
+        initial: business.name.charAt(0).toUpperCase() || "K",
     };
 });
 

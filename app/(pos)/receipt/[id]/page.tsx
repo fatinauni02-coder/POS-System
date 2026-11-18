@@ -5,10 +5,14 @@ import { Suspense } from "react";
 
 import { getBusiness } from "@/lib/business";
 import { formatRM, toSen } from "@/lib/money";
-import { hasManagerPin } from "@/lib/pin";
+import { pinNeeded } from "@/lib/pin";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PrintAllButton, PrintButton } from "./print-button";
 import { RefundButton } from "./refund-button";
+import { AutoPrint } from "./auto-print";
+import { NextKey } from "./next-key";
+import { collectQr } from "../../qr/actions";
+import { SubmitButton } from "@/components/submit-button";
 import { Loading } from "@/components/loading";
 
 // "/receipt/12" → [id] folder = a changing part of the address; here id = "12"
@@ -72,7 +76,7 @@ async function Receipt({
     const refunded = order.status === "refunded";
     const open = order.status === "open"; // a table bill that isn't paid yet: tickets only, no receipt
     const cash = order.payment_method === "cash";
-    const hasPin = await hasManagerPin(business.id);
+    const needPin = pinNeeded(business.pin_for, "refund"); // Settings → Manager PIN
 
     // "Dine-in · Table 5" or "Takeaway" — used by the receipt and both tickets
     const place =
@@ -101,8 +105,48 @@ async function Receipt({
         ...(kitchen.length > 0 ? [{ id: "kitchen", label: `Kitchen (${count(kitchen)})`, Icon: ChefHat, href: `/receipt/${id}?show=kitchen${roundQ}` }] : []),
     ];
 
-    // where "next" goes: open table bill → Tables; open QR takeaway → QR board; paid → Order screen (or Tables in restaurant mode)
-    const next = open
+    // SPLIT BILL part (paid, came from a table, the table still has a bill) → back to that table
+    const splitFrom =
+        !open && !order.table_id && order.order_type === "dine_in" && order.table_label
+            ? (
+                  await supabaseAdmin
+                      .from("orders")
+                      .select("id")
+                      .eq("business_id", business.id)
+                      .eq("status", "open")
+                      .eq("table_label", order.table_label)
+                      .not("table_id", "is", null)
+                      .maybeSingle()
+              ).data
+            : null;
+    // QR TAKEAWAY just paid → "Collected ✓" (the phone order becomes Done)
+    const { data: qrToCollect } =
+        !open && !refunded && order.order_type === "takeaway"
+            ? await supabaseAdmin
+                  .from("qr_orders")
+                  .select("id, ticket_no")
+                  .eq("business_id", business.id)
+                  .eq("order_id", order.id)
+                  .in("status", ["preparing", "ready"])
+                  .maybeSingle()
+            : { data: null };
+
+    // AUTO-PRINT after Pay / Send (?auto=1), as set in Settings → Receipt → Print by itself:
+    //   sent to the kitchen → that round's tickets · cafe order → receipt + tickets
+    //   table / QR bill paid (tickets already printed when sent) → receipt only
+    const auto = (business.auto_print ?? {}) as { receipt?: boolean; bar?: boolean; kitchen?: boolean };
+    const tableBill = Boolean(order.paid_at); // pay_bill / pay_split set paid_at; a cafe sale doesn't
+    const autoDocs = [
+        ...(!open && auto.receipt !== false ? ["receipt"] : []),
+        ...((open || !tableBill) && auto.bar !== false && bar.length > 0 ? ["bar"] : []),
+        ...((open || !tableBill) && auto.kitchen !== false && kitchen.length > 0 ? ["kitchen"] : []),
+    ];
+
+    // where "next" goes: open table bill → Tables; open QR takeaway → QR board; split part → its table;
+    // paid → Order screen (or Tables in restaurant mode)
+    const next = splitFrom
+        ? { href: `/?table=${encodeURIComponent(order.table_label)}`, title: `Back to Table ${order.table_label}`, sub: "Rest of the bill" }
+        : open
         ? order.order_type === "takeaway"
             ? { href: "/qr", title: "Back to QR orders", sub: "Order board" }
             : { href: "/tables", title: "Back to Tables", sub: "Floor plan" }
@@ -117,6 +161,10 @@ async function Receipt({
 
     return (
         <>
+            {/* prints by itself when opened right after Pay / Send (?auto=1) */}
+            <AutoPrint docs={autoDocs} />
+            {/* Space = the big "next" button */}
+            <NextKey href={next.href} />
             {/* BANNER */}
             <div className="flex items-center gap-3 border-b border-line bg-tint px-6 py-3 print:hidden">
                 {refunded ? <RotateCcw className="h-6 w-6 text-danger" /> : <CircleCheck className="h-6 w-6 text-success" />}
@@ -185,14 +233,26 @@ async function Receipt({
                             {open ? <LayoutGrid className="h-7 w-7" /> : <CirclePlus className="h-7 w-7" />}
                             <span className="text-left">
                                 <span className="block text-xl">{next.title}</span>
-                                <span className="text-sm font-semibold opacity-80">{next.sub}</span>
+                                <span className="text-sm font-semibold opacity-80">
+                                    {next.sub}
+                                    <kbd className="ml-2 hidden rounded border border-current/40 px-1.5 text-xs font-semibold lg:inline">Space</kbd>
+                                </span>
                             </span>
                         </Link>
                         <PrintAllButton sub={docs.length > 1 ? `${docs.map((d) => d.label.replace(/ \(\d+\)/, "")).join(" + ")} · 80mm` : "80mm"} />
                     </div>
+                    {/* QR takeaway: paid AND handed over → the phone order is Done, back to the QR board */}
+                    {qrToCollect && (
+                        <form action={collectQr}>
+                            <input type="hidden" name="id" value={qrToCollect.id} />
+                            <SubmitButton className="press h-16 w-full rounded-2xl bg-success text-lg font-bold text-white">
+                                Collected ✓ · Q{qrToCollect.ticket_no}
+                            </SubmitButton>
+                        </form>
+                    )}
                     {!refunded && !open && (
                         <div className="grid grid-cols-2">
-                            <RefundButton orderId={order.id} hasPin={hasPin} />
+                            <RefundButton orderId={order.id} needPin={needPin} />
                         </div>
                     )}
                 </section>
@@ -225,7 +285,7 @@ async function Receipt({
                     <div className="card flex justify-center bg-white p-6 print:border-0 print:p-0 print:shadow-none">
                         <div className="flex flex-col">
                             {!open && (
-                                <div className={`doc ${show === "receipt" ? "" : "doc-hidden"}`}>
+                                <div data-doc="receipt" className={`doc ${show === "receipt" ? "" : "doc-hidden"}`}>
                                     <ReceiptPaper
                                         business={business}
                                         order={order}
@@ -239,12 +299,12 @@ async function Receipt({
                                 </div>
                             )}
                             {bar.length > 0 && (
-                                <div className={`doc ${show === "bar" ? "" : "doc-hidden"}`}>
+                                <div data-doc="bar" className={`doc ${show === "bar" ? "" : "doc-hidden"}`}>
                                     <Ticket title={"DRINKS" + addOn} orderNo={order.order_no} place={place} when={ticketWhen} lines={bar} refunded={refunded} note={order.note} />
                                 </div>
                             )}
                             {kitchen.length > 0 && (
-                                <div className={`doc ${show === "kitchen" ? "" : "doc-hidden"}`}>
+                                <div data-doc="kitchen" className={`doc ${show === "kitchen" ? "" : "doc-hidden"}`}>
                                     <Ticket title={"KITCHEN" + addOn} orderNo={order.order_no} place={place} when={ticketWhen} lines={kitchen} refunded={refunded} note={order.note} />
                                 </div>
                             )}

@@ -19,7 +19,7 @@ import { Suspense } from "react";
 import { addDays, dayInKL, TZ } from "@/lib/dates";
 import { getBusiness } from "@/lib/business";
 import { formatRM, toSen } from "@/lib/money";
-import { hasManagerPin } from "@/lib/pin";
+import { pinNeeded } from "@/lib/pin";
 import { getStaff } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Loading } from "@/components/loading";
@@ -103,7 +103,7 @@ async function History({ searchParams }: { searchParams: PageProps<"/history">["
   // the order on the right: the one picked, or the newest
   const picked = Number(params.o);
   const selected = list.find((o) => o.id === picked) ?? (params.o === "none" ? undefined : list[0]);
-  const hasPin = selected ? await hasManagerPin(business.id) : false;
+  const needPin = pinNeeded(business.pin_for, "refund"); // Settings → Manager PIN
 
   // build an address that keeps the other choices
   const href = (change: { date?: string; f?: Filter; o?: number | "none" }) => {
@@ -283,7 +283,7 @@ async function History({ searchParams }: { searchParams: PageProps<"/history">["
             <p>Select an order to see its details</p>
           </div>
         ) : (
-          <Detail order={selected} items={items(selected)} time={time} closeHref={href({ o: "none" })} hasPin={hasPin} />
+          <Detail order={selected} items={items(selected)} time={time} closeHref={href({ o: "none" })} needPin={needPin} />
         )}
       </aside>
     </div>
@@ -328,13 +328,13 @@ function Detail({
   items,
   time,
   closeHref,
-  hasPin,
+  needPin,
 }: {
   order: Order;
   items: number;
   time: (iso: string) => string;
   closeHref: string;
-  hasPin: boolean;
+  needPin: boolean;
 }) {
   const refunded = o.status === "refunded";
   const rounding = toSen(o.rounding);
@@ -425,7 +425,7 @@ function Detail({
             Already refunded
           </button>
         ) : (
-          <RefundButton orderId={o.id} hasPin={hasPin} className="btn-soft flex h-12 w-full items-center justify-center gap-2 text-danger">
+          <RefundButton orderId={o.id} needPin={needPin} className="btn-soft flex h-12 w-full items-center justify-center gap-2 text-danger">
             <RotateCcw className="h-4 w-4" />
             Issue refund
           </RefundButton>
