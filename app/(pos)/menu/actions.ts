@@ -204,3 +204,82 @@ export async function toggleShowInApp(formData: FormData) {
 
     refresh();
 }
+
+
+// ---------- item photo (migration 013: Storage bucket "menu-photos") ----------
+
+const PHOTO_BUCKET = "menu-photos";
+const PHOTO_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/webp": "webp", "image/png": "png" };
+
+// the browser already shrank the photo (photo-upload.tsx), so it's small; checked again here
+export async function uploadItemPhoto(formData: FormData): Promise<string | null> {
+    await requireManager(); // owners/managers only
+    const business = await getBusiness();
+    if (!business) return "Shop not found";
+
+    const id = Number(formData.get("id"));
+    const file = formData.get("photo");
+    if (!Number.isInteger(id)) return "Bad item id";
+    if (!(file instanceof File) || file.size === 0) return "Pick a photo first";
+    const ext = PHOTO_TYPES[file.type];
+    if (!ext) return "Use a JPG, PNG or WebP photo";
+    if (file.size > 1024 * 1024) return "Photo is too big (max 1 MB)";
+
+    // the item must be this shop's; remember the old photo to delete it after
+    const { data: item } = await supabaseAdmin
+        .from("menu_items")
+        .select("id, image_url")
+        .eq("business_id", business.id)
+        .eq("id", id)
+        .maybeSingle();
+    if (!item) return "Item not found";
+
+    // a new file name every time, so phones never show an old cached photo
+    const path = `${business.id}/${id}-${Date.now()}.${ext}`;
+    const { error: upError } = await supabaseAdmin.storage
+        .from(PHOTO_BUCKET)
+        .upload(path, file, { contentType: file.type, cacheControl: "31536000" });
+    if (upError) {
+        console.error("photo upload failed:", upError);
+        return "Couldn't upload the photo. Did you run migration 013?";
+    }
+    const url = supabaseAdmin.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+
+    const { error } = await supabaseAdmin.from("menu_items").update({ image_url: url }).eq("business_id", business.id).eq("id", id);
+    if (error) return error.message;
+
+    await deleteStoredPhoto(item.image_url); // the old file is not needed any more
+    refresh();
+    return null;
+}
+
+export async function removeItemPhoto(formData: FormData) {
+    await requireManager(); // owners/managers only
+    const business = await getBusiness();
+    if (!business) throw new Error("Shop not found");
+
+    const id = Number(formData.get("id"));
+    if (!Number.isInteger(id)) throw new Error("Bad item id");
+
+    const { data: item } = await supabaseAdmin
+        .from("menu_items")
+        .select("image_url")
+        .eq("business_id", business.id)
+        .eq("id", id)
+        .maybeSingle();
+    if (!item) throw new Error("Item not found");
+
+    const { error } = await supabaseAdmin.from("menu_items").update({ image_url: null }).eq("business_id", business.id).eq("id", id);
+    if (error) throw new Error(error.message);
+
+    await deleteStoredPhoto(item.image_url);
+    refresh();
+}
+
+// delete a photo file — only if it's one of OUR uploads (a link typed by hand is left alone)
+async function deleteStoredPhoto(url: string | null) {
+    const marker = `/storage/v1/object/public/${PHOTO_BUCKET}/`;
+    if (!url || !url.includes(marker)) return;
+    const path = decodeURIComponent(url.split(marker)[1]);
+    await supabaseAdmin.storage.from(PHOTO_BUCKET).remove([path]);
+}

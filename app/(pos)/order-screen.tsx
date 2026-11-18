@@ -16,7 +16,7 @@ import { Spinner, SubmitButton } from "@/components/submit-button";
 // (if you add a column to a Supabase select in page.tsx, add it here too)
 type Category = { id: string; name: string };
 export type Item = {
-    id: number; name: string; price: number | string; category_id: string | null; is_available: boolean;
+    id: number; name: string; price: number | string; image_url?: string | null; category_id: string | null; is_available: boolean;
     menu_item_option_groups: { group_id: string }[]; // which option groups this item uses
     left: number | null;
 };
@@ -362,9 +362,15 @@ export function OrderScreen({ categories, items, groups, sstRate, tables, tableI
                         >
                             {/* PICTURE placeholder: aspect-[4/3] = always 4 wide : 3 tall (aspect-square = square)
                                 text-3xl = letter size; text-primary/50 = orange at 50% */}
-                            <span className="flex aspect-[4/3] items-center justify-center rounded-xl bg-tint text-3xl font-bold text-primary/50">
-                                {item.name.charAt(0)}
-                            </span>
+                            {item.image_url ? (
+                                // the item's photo (Menu → Upload photo); lazy = loads when scrolled into view
+                                // eslint-disable-next-line @next/next/no-img-element -- photo from Supabase Storage
+                                <img src={item.image_url} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-xl object-cover" />
+                            ) : (
+                                <span className="flex aspect-[4/3] items-center justify-center rounded-xl bg-tint text-3xl font-bold text-primary/50">
+                                    {item.name.charAt(0)}
+                                </span>
+                            )}
                             {/* NAME: mt-2 = gap above */}
                             <span className="mt-2 font-semibold">{item.name}</span>
                             {/* PRICE (or "Sold out") */}

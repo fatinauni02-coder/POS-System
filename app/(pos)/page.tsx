@@ -55,7 +55,7 @@ async function OrderContent({ searchParams }: { searchParams: PageProps<"/">["se
     supabase.from("categories").select("id, name").eq("business_id", business.id).order("sort_order"),
     supabase
       .from("menu_items")
-      .select("id, name, price, category_id, is_available, menu_item_option_groups(group_id)")
+      .select("id, name, price, image_url, category_id, is_available, menu_item_option_groups(group_id)")
       .eq("business_id", business.id)
       .order("name"),
     // option groups + their options (e.g. Temperature: Hot / Iced), groups sorted, then options inside each group

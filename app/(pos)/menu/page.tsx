@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { toggleShowInApp, toggleSoldOut } from "./actions";
 import { ItemEditor } from "./item-editor";
+import { PhotoUpload } from "./photo-upload";
 import { RecipeEditor } from "./recipe-editor";
 import { ItemOptionGroups } from "./item-option-groups";
 import { DeleteItemButton } from "./delete-item-button";
@@ -240,9 +241,10 @@ async function MenuContent({ searchParams }: { searchParams: PageProps<"/menu">[
                         <>
                             {/* picture + the two switches */}
                             <div className="px-5 pt-5">
-                                <div className="flex items-center gap-4 rounded-2xl bg-tint p-3">
-                                    <Picture name={selected.name} url={selected.image_url} big />
-                                    <div className="flex-1 space-y-2 text-sm font-semibold">
+                                <div className="space-y-3 rounded-2xl bg-tint p-3">
+                                    {/* photo + Upload / Change / Remove */}
+                                    <PhotoUpload key={selected.image_url ?? "none"} itemId={selected.id} name={selected.name} url={selected.image_url} />
+                                    <div className="space-y-2 border-t border-line pt-3 text-sm font-semibold">
                                         <form action={toggleSoldOut} className="flex items-center justify-between gap-2">
                                             <input type="hidden" name="id" value={selected.id} />
                                             <input type="hidden" name="available" value={String(selected.is_available)} />
@@ -279,8 +281,8 @@ async function MenuContent({ searchParams }: { searchParams: PageProps<"/menu">[
 }
 
 // the item photo, or its first letter on orange when there is no photo
-function Picture({ name, url, grey, big }: { name: string; url: string | null; grey?: boolean; big?: boolean }) {
-    const size = big ? "h-20 w-20" : "h-16 w-16 xl:h-20 xl:w-20";
+function Picture({ name, url, grey }: { name: string; url: string | null; grey?: boolean }) {
+    const size = "h-16 w-16 xl:h-20 xl:w-20";
     return (
         <div className={`${size} shrink-0 overflow-hidden rounded-xl ${grey ? "grayscale" : ""}`}>
             {url ? (
