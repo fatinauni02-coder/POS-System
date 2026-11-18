@@ -1,4 +1,4 @@
-import { Armchair, Check, CircleCheck, Coffee, LayoutGrid, Lock, LockKeyhole, Percent, Receipt, Save, Settings, Store } from "lucide-react";
+import { Armchair, ChevronRight, Users, Check, CircleCheck, Coffee, LayoutGrid, Lock, LockKeyhole, Percent, Receipt, Save, Settings, Store } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -93,6 +93,13 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
               {label}
             </Link>
           ))}
+          {/* Staff accounts is its own page — it used to be its own button in the sidebar */}
+          <div className="my-1 border-t border-line" />
+          <Link href="/staff" className="press flex items-center gap-3 rounded-xl px-3 py-3 font-semibold hover:bg-tint">
+            <Users className="h-5 w-5" />
+            Staff accounts
+            <ChevronRight className="ml-auto h-4 w-4 text-ink-3" />
+          </Link>
         </nav>
 
         <main className="min-w-0 flex-1">
@@ -221,6 +228,18 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
               </button>
             </Section>
           </form>
+
+          {/* phones / tablets: the Staff page link (big screens have it in the left list) */}
+          <Link href="/staff" className="card press mt-4 flex items-center gap-3 p-4 font-semibold lg:hidden">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-tint text-primary">
+              <Users className="h-5 w-5" />
+            </span>
+            <span className="flex-1">
+              Staff accounts
+              <span className="block text-sm font-normal text-ink-2">Add or remove cashiers and managers</span>
+            </span>
+            <ChevronRight className="h-5 w-5 text-ink-3" />
+          </Link>
         </main>
       </div>
     </div>

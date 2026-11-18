@@ -1,22 +1,27 @@
 "use client"; // needs the browser: usePathname reads the current address
 
-import { ChartColumn, Package, ReceiptText, Settings, ShoppingBasket, Users, UtensilsCrossed, LayoutGrid, QrCode } from "lucide-react";
+import { Package, ReceiptText, Settings, ShoppingBasket, UtensilsCrossed, LayoutGrid, QrCode } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// MENU LINKS — add / remove / reorder buttons here.
+// MENU LINKS — add / remove / reorder buttons here (same order as the pos_html prototype).
 // icon = any icon from lucide.dev (import it on line 3 first)
+// also = other pages that light up this button (Report lives under History, Staff under Settings)
 export const NAV = [
-  { href: "/", label: "Order", icon: ShoppingBasket, managerOnly: false },
   { href: "/tables", label: "Tables", icon: LayoutGrid, managerOnly: false, restaurantOnly: true },
+  { href: "/", label: "Order", icon: ShoppingBasket, managerOnly: false },
   { href: "/qr", label: "QR", icon: QrCode, managerOnly: false },
-  { href: "/menu", label: "Menu", icon: UtensilsCrossed, managerOnly: true },
+  { href: "/history", label: "History", icon: ReceiptText, managerOnly: false, also: ["/report"] },
   { href: "/stock", label: "Stock", icon: Package, managerOnly: true },
-  { href: "/staff", label: "Staff", icon: Users, managerOnly: true },
-  { href: "/settings", label: "Settings", icon: Settings, managerOnly: true },
-  { href: "/history", label: "History", icon: ReceiptText, managerOnly: false },
-  { href: "/report", label: "Report", icon: ChartColumn, managerOnly: true },
+  { href: "/menu", label: "Menu", icon: UtensilsCrossed, managerOnly: true },
+  { href: "/settings", label: "Settings", icon: Settings, managerOnly: true, also: ["/staff"] },
 ];
+
+// true when this button belongs to the page you're on
+export function isActive(n: (typeof NAV)[number], path: string) {
+  if (n.href === "/") return path === "/";
+  return [n.href, ...(n.also ?? [])].some((h) => path.startsWith(h));
+}
 
 // which links this person sees: managers see everything, staff don't see managerOnly;
 // "Tables" only when the shop is in restaurant mode
@@ -51,8 +56,9 @@ export function SideNav({ isManager, isRestaurant, newQr, lowStock }: NavProps) 
 
       {/* LINKS: gap-1.5 = space between buttons */}
       <nav className="flex flex-col gap-1.5">
-        {visibleNav(isManager, isRestaurant).map(({ href, label, icon: Icon }) => {
-          const active = href === "/" ? path === "/" : path.startsWith(href); // true for the page you are on
+        {visibleNav(isManager, isRestaurant).map((n) => {
+          const { href, label, icon: Icon } = n;
+          const active = isActive(n, path); // true for the page you are on
           return (
             // ONE BUTTON (icon on top, label under it)
             // w-[56px] = button width (keep it smaller than the sidebar width)
@@ -62,7 +68,7 @@ export function SideNav({ isManager, isRestaurant, newQr, lowStock }: NavProps) 
             <Link
               key={href}
               href={href}
-              className={`relative flex w-[56px] flex-col items-center gap-1 rounded-2xl py-2.5 text-[11px] font-semibold ${active ? "bg-primary-soft text-white" : "text-ink-2 hover:bg-tint"
+              className={`press relative flex w-[56px] flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-semibold ${active ? "bg-primary-soft text-on-primary shadow-card" : "text-ink-2 hover:bg-tint"
                 }`}
             >
               {/* icon size: h-5 w-5 (20px). Try h-6 w-6 for bigger */}
@@ -85,7 +91,7 @@ export function NavBadge({ href, newQr, lowStock }: { href: string; newQr: numbe
   return (
     <span
       className={`absolute right-1 top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold text-white ${
-        href === "/qr" ? "bg-red-600" : "bg-amber-500"
+        href === "/qr" ? "bg-danger" : "bg-warning"
       }`}
     >
       {count}

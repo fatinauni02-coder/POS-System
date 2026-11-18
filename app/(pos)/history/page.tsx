@@ -20,6 +20,7 @@ import { addDays, dayInKL, TZ } from "@/lib/dates";
 import { getBusiness } from "@/lib/business";
 import { formatRM, toSen } from "@/lib/money";
 import { hasManagerPin } from "@/lib/pin";
+import { getStaff } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Loading } from "@/components/loading";
 import { RefundButton } from "../receipt/[id]/refund-button";
@@ -59,6 +60,8 @@ async function History({ searchParams }: { searchParams: PageProps<"/history">["
 
   const business = await getBusiness();
   if (!business) return <p className="p-6 text-danger">Shop not found</p>;
+  const staff = await getStaff();
+  const isManager = staff !== null && staff.role !== "staff"; // the Report button is for managers
 
   // one Malaysian day = from 00:00 (+08:00) to 00:00 the next day
   const { data: orders, error } = await supabaseAdmin
@@ -194,6 +197,14 @@ async function History({ searchParams }: { searchParams: PageProps<"/history">["
               );
             })}
           </div>
+
+          {/* END-OF-DAY REPORT (managers) — it used to be its own button in the sidebar */}
+          {isManager && (
+            <Link href={day === today ? "/report" : `/report?date=${day}`} className="btn-soft flex h-12 items-center gap-2 px-4">
+              <ChartColumn className="h-5 w-5" />
+              Day report
+            </Link>
+          )}
         </div>
 
         {/* TABLE */}
