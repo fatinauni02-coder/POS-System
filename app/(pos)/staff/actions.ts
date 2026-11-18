@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { getBusiness } from "@/lib/business";
 import { requireManager, type Role } from "@/lib/staff";
+import { clearOwnPin } from "@/lib/pin";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { toLoginEmail, USERNAME_PATTERN } from "@/lib/username";
 
@@ -123,6 +124,18 @@ export async function resetPassword(formData: FormData) {
     if (error) fail(`Couldn't change the password: ${error.message}`);
 
     done("Password changed. Tell them the new one.");
+}
+
+// CLEAR PIN: they forgot their manager PIN → remove it; they set a new one in Settings → Manager PIN
+// (same rules as the other buttons: the owner for managers, a manager for staff)
+export async function clearPin(formData: FormData) {
+    const me = await requireManager();
+    const businessId = await shopId();
+    const userId = String(formData.get("user_id") ?? "");
+
+    await checkCanEdit(businessId, me, userId);
+    await clearOwnPin(businessId, userId);
+    done("PIN cleared. They can set a new one in Settings → Manager PIN.");
 }
 
 // REMOVE: unlink from the shop AND delete the login, so they can't sign in any more.

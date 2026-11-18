@@ -5,7 +5,7 @@ import { TZ } from "@/lib/dates";
 import { getStaff, type Role } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { displayName } from "@/lib/username";
-import { addStaff, resetPassword, setRole } from "./actions";
+import { addStaff, clearPin, resetPassword, setRole } from "./actions";
 import { RemoveButton } from "./remove-button";
 import { Loading } from "@/components/loading";
 import { SubmitButton } from "@/components/submit-button";
@@ -27,7 +27,7 @@ const ROLE_BADGE: Record<Role, string> = {
     staff: "bg-tint text-ink-2",
 };
 
-type Person = { id: string; role: Role; name: string; lastSignIn: string | null };
+type Person = { id: string; role: Role; name: string; lastSignIn: string | null; hasPin: boolean };
 
 async function Staff({ searchParams }: { searchParams: PageProps<"/staff">["searchParams"] }) {
     const params = await searchParams;
@@ -45,6 +45,10 @@ async function Staff({ searchParams }: { searchParams: PageProps<"/staff">["sear
         .eq("business_id", business.id);
     if (error) return <p className="p-6 text-red-600">Error: {error.message}</p>;
 
+    // who has their own manager PIN (migration 015) — only "yes / no", never the PIN
+    const { data: pinRows } = await supabaseAdmin.from("member_pins").select("user_id").eq("business_id", business.id);
+    const withPin = new Set((pinRows ?? []).map((r) => r.user_id));
+
     // 2) their emails live in Supabase Auth, not in our table → ask for each person (a cafe has only a few)
     const people: Person[] = await Promise.all(
         (rows ?? []).map(async (r) => {
@@ -54,6 +58,7 @@ async function Staff({ searchParams }: { searchParams: PageProps<"/staff">["sear
                 role: r.role as Role,
                 name: data.user?.email ? displayName(data.user.email) : "(login deleted)",
                 lastSignIn: data.user?.last_sign_in_at ?? null,
+                hasPin: withPin.has(r.user_id),
             };
         }),
     );
@@ -125,7 +130,10 @@ async function Staff({ searchParams }: { searchParams: PageProps<"/staff">["sear
                                     {p.name}
                                     {p.id === me.id && <span className="ml-2 text-sm font-normal text-ink-2">(you)</span>}
                                 </p>
-                                <p className="text-sm text-ink-2">Last sign-in: {formatWhen(p.lastSignIn)}</p>
+                                <p className="text-sm text-ink-2">
+                                    Last sign-in: {formatWhen(p.lastSignIn)}
+                                    {p.role !== "staff" && (p.hasPin ? " · PIN set ✓" : " · no PIN yet")}
+                                </p>
                             </div>
                             <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${ROLE_BADGE[p.role]}`}>{ROLE_NAMES[p.role]}</span>
                         </div>
@@ -153,6 +161,12 @@ async function Staff({ searchParams }: { searchParams: PageProps<"/staff">["sear
                                     />
                                     <SubmitButton className="h-10 rounded-xl bg-tint px-3 text-sm font-semibold">Reset password</SubmitButton>
                                 </form>
+                                {p.hasPin && (
+                                    <form action={clearPin}>
+                                        <input type="hidden" name="user_id" value={p.id} />
+                                        <SubmitButton className="h-10 rounded-xl bg-tint px-3 text-sm font-semibold">Clear PIN</SubmitButton>
+                                    </form>
+                                )}
                                 <RemoveButton userId={p.id} name={p.name} />
                             </div>
                         )}

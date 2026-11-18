@@ -173,6 +173,8 @@ async function Receipt({
                                     <Fact label="Total billed" value={formatRM(toSen(order.total))} />
                                     <Fact label="Cashier" value={order.cashier ?? "—"} />
                                     <Fact label="Settled" value={malaysiaTime(order.paid_at ?? order.created_at)} />
+                                    {order.discount_by && <Fact label="Discount approved by" value={order.discount_by} />}
+                                    {order.refunded_by && <Fact label="Refund approved by" value={order.refunded_by} />}
                                 </>
                             )}
                         </dl>

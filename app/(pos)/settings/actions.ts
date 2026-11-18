@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { checkManagerPin, hasManagerPin, setManagerPin } from "@/lib/pin";
+import { checkOwnPin, hasOwnPin, setOwnPin } from "@/lib/pin";
 import { getBusiness } from "@/lib/business";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireManager } from "@/lib/staff";
@@ -65,7 +65,7 @@ function pinFail(message: string): never {
 }
 
 export async function changePin(formData: FormData) {
-    await requireManager(); // owners/managers only
+    const me = await requireManager(); // owners/managers only — each sets THEIR OWN PIN
     const business = await getBusiness();
     if (!business) pinFail("Shop not found");
 
@@ -73,14 +73,14 @@ export async function changePin(formData: FormData) {
     const next = String(formData.get("next") ?? "");
     const again = String(formData.get("again") ?? "");
 
-    // if a PIN exists, the current one must be right (so a cashier can't just change it)
-    if (await hasManagerPin(business.id)) { 
-        const pinError = await checkManagerPin(business.id, current);
-        if (pinError) pinFail(pinError);
+    // changing an existing PIN needs the current one (so nobody else at the till can change it)
+    if (await hasOwnPin(business.id, me.id)) {
+        if (!(await checkOwnPin(business.id, me.id, current))) pinFail("Current PIN is wrong");
     }
     if (!/^\d{4,6}$/.test(next)) pinFail("New PIN must be 4 to 6 digits");
     if (next !== again) pinFail("The two new PINs are different");
 
-    if (!(await setManagerPin(business.id, next))) pinFail("Couldn't save the PIN");
+    const problem = await setOwnPin(business.id, me.id, next);
+    if (problem) pinFail(problem);
     redirect(`/settings?tab=security&pin=changed&t=${Date.now()}`);
 }

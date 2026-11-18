@@ -22,8 +22,8 @@ export async function refundOrder(orderId: number, pin: string, restock: boolean
   if (!(await getStaff())) return "Please sign in again."; // staff only (the PIN alone isn't enough)
 
   // checked HERE on the server — the browser can't skip it
-  const pinError = await checkManagerPin(business.id, pin);
-  if (pinError) return pinError;
+  const check = await checkManagerPin(business.id, pin);
+  if (!check.ok) return check.message;
 
   // migration 006: marks the order refunded and (if asked) puts the stock back
   const { error } = await supabaseAdmin.rpc("refund_order", {
@@ -35,6 +35,8 @@ export async function refundOrder(orderId: number, pin: string, restock: boolean
     console.error("refund_order failed:", error);
     return MESSAGES[error.message] ?? "Couldn't refund. Please try again.";
   }
+  // who approved the refund (migration 015)
+  await supabaseAdmin.from("orders").update({ refunded_by: check.by }).eq("business_id", business.id).eq("id", orderId);
 
   refresh(); // redraw the receipt so it shows REFUNDED
   return null;

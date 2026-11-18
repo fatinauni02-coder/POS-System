@@ -25,3 +25,17 @@ export function isApproved(token: string | null | undefined, text: string) {
   const given = Buffer.from(sig, "hex");
   return good.length === given.length && timingSafeEqual(good, given);
 }
+
+// DISCOUNT SLIP with the approver's name in front: "ali~<expires>.<signature>".
+// The name is part of what's signed, so it can't be swapped for someone else's.
+export function makeDiscountApproval(businessId: string, pct: number, by: string) {
+  return `${encodeURIComponent(by)}~${makeApproval(`discount:${businessId}:${pct}:${by}`)}`;
+}
+
+// the approver's name if the slip is real for this shop + %, otherwise null
+export function discountApprovedBy(token: string | null | undefined, businessId: string, pct: number) {
+  const [name, slip] = (token ?? "").split("~");
+  if (!name || !slip) return null;
+  const by = decodeURIComponent(name);
+  return isApproved(slip, `discount:${businessId}:${pct}:${by}`) ? by : null;
+}

@@ -67,7 +67,7 @@ async function History({ searchParams }: { searchParams: PageProps<"/history">["
   const { data: orders, error } = await supabaseAdmin
     .from("orders")
     .select(
-      "id, order_no, created_at, payment_method, order_type, table_label, customer_name, cashier, note, " +
+      "id, order_no, created_at, payment_method, order_type, table_label, customer_name, cashier, note, discount_by, refunded_by, " +
         "subtotal, discount, discount_pct, sst_amount, sst_rate, rounding, total, status, " +
         "order_items(id, item_name, quantity, line_total, options, notes, voided), qr_orders(ticket_no)",
     )
@@ -309,6 +309,8 @@ type Order = {
   customer_name: string | null;
   cashier: string | null;
   note: string | null;
+  discount_by: string | null; // who approved the discount (migration 015)
+  refunded_by: string | null; // who approved the refund
   subtotal: number | string;
   discount: number | string;
   discount_pct: number | string;
@@ -389,6 +391,12 @@ function Detail({
               </li>
             ))}
         </ul>
+        {(o.discount_by || o.refunded_by) && (
+          <p className="mt-4 text-sm text-ink-2">
+            {o.discount_by && <span className="block">Discount approved by <b className="text-ink">{o.discount_by}</b></span>}
+            {o.refunded_by && <span className="block">Refund approved by <b className="text-ink">{o.refunded_by}</b></span>}
+          </p>
+        )}
         {o.note && (
           <p className="mt-4 rounded-xl bg-tint p-3 text-sm">
             <b>Kitchen note:</b> {o.note}

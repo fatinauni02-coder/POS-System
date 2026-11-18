@@ -4,7 +4,8 @@ import { Suspense } from "react";
 
 import { getBusiness } from "@/lib/business";
 import { Toast } from "@/components/toast";
-import { hasManagerPin } from "@/lib/pin";
+import { hasOwnPin } from "@/lib/pin";
+import { getStaff } from "@/lib/staff";
 import { changePin, saveSettings } from "./actions";
 import { Loading } from "@/components/loading";
 import { SubmitButton } from "@/components/submit-button";
@@ -35,7 +36,8 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
   const tab: Tab = TABS.some((t) => t.id === params.tab) ? (params.tab as Tab) : "business";
   const business = await getBusiness();
   if (!business) return <p className="p-6 text-danger">Shop not found</p>;
-  const hasPin = await hasManagerPin(business.id);
+  const me = await getStaff();
+  const hasPin = me ? await hasOwnPin(business.id, me.id) : false; // MY OWN PIN (each manager has one)
 
   // every section of the settings form is ON the page (so Save sends all of them).
   // Big screens (lg): only the picked tab shows. Phones / tablets: ALL sections, one under the other.
@@ -212,7 +214,7 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
 
           {/* MANAGER PIN: its boxes belong to the "pin" form at the end of the page (form="pin") */}
           <div className={`mt-4 lg:mt-0 ${show("security")}`}>
-            <Section title="Manager PIN" desc={hasPin ? "Needed for refunds and discounts. Enter the current PIN to change it." : "No PIN yet — set one here."}>
+            <Section title={`My manager PIN${me ? ` · ${me.name}` : ""}`} desc={hasPin ? "Your own PIN for discounts, refunds and voids — receipts show you approved. Enter your current PIN to change it." : "You don't have a PIN yet. Set one so you can approve discounts, refunds and voids."}>
               <div className="grid gap-4 sm:grid-cols-3">
                 {hasPin && (
                   <Field label="Current PIN">

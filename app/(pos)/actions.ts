@@ -1,7 +1,7 @@
 "use server"; // everything in this file runs ONLY on the server (never in the browser)
 
 import { getBusiness } from "@/lib/business";
-import { isApproved, makeApproval } from "@/lib/approval";
+import { discountApprovedBy, makeDiscountApproval } from "@/lib/approval";
 import { DISCOUNTS } from "@/lib/money";
 import { checkManagerPin } from "@/lib/pin";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -55,7 +55,9 @@ export async function placeOrder(input: OrderInput): Promise<OrderResult> {
     if (!staff) return { ok: false, message: "Please sign in again." };
 
     // a discount only counts with a real approval slip for THIS shop and THIS %
-    if (input.discountPct > 0 && !isApproved(input.discountToken, `discount:${business.id}:${input.discountPct}`)) {
+    // who approved it (null = no discount, or the slip isn't real)
+    const discountBy = input.discountPct > 0 ? discountApprovedBy(input.discountToken, business.id, input.discountPct) : null;
+    if (input.discountPct > 0 && !discountBy) {
         return { ok: false, message: "the discount needs the manager PIN again. Remove it and add it again." };
     }
 
@@ -83,7 +85,7 @@ export async function placeOrder(input: OrderInput): Promise<OrderResult> {
     // stamp who rang it up (create_order doesn't know about logins, so a second small update)
     await supabaseAdmin
         .from("orders")
-        .update({ staff_id: staff.id, cashier: staff.name })
+        .update({ staff_id: staff.id, cashier: staff.name, discount_by: discountBy })
         .eq("business_id", business.id)
         .eq("id", data.order_id);
     return { ok: true, orderId: data.order_id, orderNo: data.order_no, change: data.change };
@@ -130,7 +132,9 @@ export async function payBill(input: PayBillInput): Promise<OrderResult> {
     if (!staff) return { ok: false, message: "Please sign in again." };
 
     // same rule as placeOrder: a discount only counts with a real approval slip
-    if (input.discountPct > 0 && !isApproved(input.discountToken, `discount:${business.id}:${input.discountPct}`)) {
+    // who approved it (null = no discount, or the slip isn't real)
+    const discountBy = input.discountPct > 0 ? discountApprovedBy(input.discountToken, business.id, input.discountPct) : null;
+    if (input.discountPct > 0 && !discountBy) {
         return { ok: false, message: "the discount needs the manager PIN again. Remove it and add it again." };
     }
 
@@ -152,7 +156,7 @@ export async function payBill(input: PayBillInput): Promise<OrderResult> {
     // the cashier = whoever took the payment
     await supabaseAdmin
         .from("orders")
-        .update({ staff_id: staff.id, cashier: staff.name })
+        .update({ staff_id: staff.id, cashier: staff.name, discount_by: discountBy })
         .eq("business_id", business.id)
         .eq("id", data.order_id);
     return { ok: true, orderId: data.order_id, orderNo: data.order_no, change: data.change };
@@ -171,7 +175,9 @@ export async function paySplit(input: PayBillInput & { lines: SplitLine[] }): Pr
     const staff = await getStaff();
     if (!staff) return { ok: false, message: "Please sign in again." };
 
-    if (input.discountPct > 0 && !isApproved(input.discountToken, `discount:${business.id}:${input.discountPct}`)) {
+    // who approved it (null = no discount, or the slip isn't real)
+    const discountBy = input.discountPct > 0 ? discountApprovedBy(input.discountToken, business.id, input.discountPct) : null;
+    if (input.discountPct > 0 && !discountBy) {
         return { ok: false, message: "the discount needs the manager PIN again. Remove it and add it again." };
     }
     const lines = input.lines.filter((l) => Number.isInteger(l.lineId) && Number.isInteger(l.qty) && l.qty > 0);
@@ -195,7 +201,7 @@ export async function paySplit(input: PayBillInput & { lines: SplitLine[] }): Pr
     // the cashier = whoever took this payment
     await supabaseAdmin
         .from("orders")
-        .update({ staff_id: staff.id, cashier: staff.name })
+        .update({ staff_id: staff.id, cashier: staff.name, discount_by: discountBy })
         .eq("business_id", business.id)
         .eq("id", data.order_id);
     return { ok: true, orderId: data.order_id, orderNo: data.order_no, change: data.change, wholeBill: data.whole_bill === true };
@@ -234,8 +240,8 @@ export async function voidLine(lineId: number, pin: string, restock: boolean): P
     if (!staff) return "Please sign in again.";
 
     // checked HERE on the server — the browser can't skip it
-    const pinError = await checkManagerPin(business.id, pin);
-    if (pinError) return pinError;
+    const check = await checkManagerPin(business.id, pin);
+    if (!check.ok) return check.message;
 
     // migration 010: marks the line voided, puts its stock back (if asked), updates the bill;
     // if nothing is left on the bill, the bill closes and the table is free
@@ -248,6 +254,8 @@ export async function voidLine(lineId: number, pin: string, restock: boolean): P
         console.error("void_line failed:", error);
         return MESSAGES[error.message] ?? "Couldn't void the item. Please try again.";
     }
+    // who approved the void (migration 015)
+    await supabaseAdmin.from("order_items").update({ voided_by: check.by }).eq("business_id", business.id).eq("id", lineId);
 
     refresh(); // redraw the table screen with the new bill
     return null;
@@ -265,8 +273,9 @@ export async function approveDiscount(pct: number, pin: string): Promise<Discoun
     if (!business) return { ok: false, message: "Shop not found" };
     if (!(await getStaff())) return { ok: false, message: "Please sign in again." };
 
-    const pinError = await checkManagerPin(business.id, pin);
-    if (pinError) return { ok: false, message: pinError };
+    const check = await checkManagerPin(business.id, pin);
+    if (!check.ok) return { ok: false, message: check.message };
 
-    return { ok: true, token: makeApproval(`discount:${business.id}:${pct}`) };
+    // the slip remembers WHO approved (saved on the order when it's paid)
+    return { ok: true, token: makeDiscountApproval(business.id, pct, check.by) };
 }
