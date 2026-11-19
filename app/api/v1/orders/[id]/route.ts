@@ -18,7 +18,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     // 2. the order + whether its bill is paid (orders.status)
     const { data: q } = await supabaseAdmin
         .from("qr_orders")
-        .select("ticket_no, order_type, table_label, customer_name, status, reject_reason, lines, subtotal, created_at, orders(status)")
+        .select("ticket_no, order_type, table_label, status, reject_reason, lines, subtotal, created_at, orders(status)")
         .eq("id", id)
         .maybeSingle();
     if (!q) {
@@ -32,7 +32,6 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         ticketNo: q.ticket_no,
         type: q.order_type,
         table: q.table_label,
-        name: q.customer_name,
         status: q.status, // new → preparing → ready → done   (or rejected)
         rejectReason: q.reject_reason,
         paid: bill?.status === "completed",
@@ -42,7 +41,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
             name: l.name,
             qty: l.qty,
             options: (l.options ?? []).map((o) => o.name),
-            note: l.note || null,
+            // name + note are NOT returned on purpose: this endpoint is public (anon key),
+            // and the app never shows them. Keeps customer PII off the public API.
         })),
     });
 }
