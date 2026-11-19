@@ -29,6 +29,9 @@ export async function proxy(request: NextRequest) {
   // CUSTOMER QR PAGES: open to everyone, no login. ONLY "/order/…" — every other address stays staff-only.
   if (path === "/order" || path.startsWith("/order/")) return response;
 
+    // CUSTOMER APP API: open to the app, no staff login (each API checks what it needs itself)
+  if (path.startsWith("/api/v1/")) return response;
+
   if (!user && !onLogin) return NextResponse.redirect(new URL("/login", request.url));
   if (user && onLogin) return NextResponse.redirect(new URL("/", request.url));
   return response;
