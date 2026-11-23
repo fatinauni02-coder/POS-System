@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { getBusiness } from "@/lib/business";
 import { getStaff, requireManager } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { notifyQrOrder } from "@/lib/push";
 
 const PAGE = "/qr";
 
@@ -59,6 +61,7 @@ export async function rejectQr(formData: FormData) {
     const reason = String(formData.get("reason") ?? "").trim().slice(0, 120);
     const { error } = await supabaseAdmin.rpc("reject_qr_order", { p_business_id: business.id, p_id: id, p_reason: reason });
     if (error) back("error", MESSAGES[error.message] ?? "Couldn't reject the order.");
+    after(() => notifyQrOrder(business.id, id, "rejected")); // push to the app, after the board answers
     back("msg", "Order rejected — the customer sees the reason on their phone");
 }
 
@@ -69,6 +72,7 @@ export async function moveQr(formData: FormData) {
     const status = formData.get("status") === "done" ? "done" : "ready";
     const { error } = await supabaseAdmin.rpc("set_qr_status", { p_business_id: business.id, p_id: id, p_status: status });
     if (error) back("error", MESSAGES[error.message] ?? "Couldn't update the order.");
+    if (status === "ready") after(() => notifyQrOrder(business.id, id, "ready")); // "Your order Q12 is ready!"
     back("msg", status === "ready" ? "Marked ready — the customer sees it on their phone" : "Done");
 }
 
