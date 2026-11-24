@@ -94,7 +94,7 @@ export function DuitnowUpload({ url }: { url: string | null }) {
                 {found && <p className="text-xs font-semibold text-success">QR saved ✓{found !== "saved" && ` · Name in the QR: ${found}`}</p>}
                 {unsure && (
                     <div className="max-w-sm rounded-xl bg-warning/15 p-3 text-xs text-ink-2">
-                        <p className="font-semibold text-warning">Found a QR, but it isn&apos;t in the usual DuitNow format.</p>
+                        <p className="font-semibold text-warning">Found a QR, but it doesn&apos;t look like a DuitNow QR.</p>
                         <p className="mt-1 break-all">It reads: <code>{unsure.raw.slice(0, 60)}{unsure.raw.length > 60 ? "…" : ""}</code></p>
                         <p className="mt-1">Some banks&apos; personal QRs look like this. Only use it if paying it with another banking app works.</p>
                         <button type="button" disabled={busy} onClick={() => save(unsure)} className="btn-soft mt-2 h-9 px-3 text-xs">
@@ -133,8 +133,10 @@ async function cropToQr(file: File): Promise<Cropped | string> {
         return "No QR code found in this picture. Try a clearer, straight-on picture of the QR.";
     }
 
-    // 2. is it a standard payment QR? DuitNow (and every EMV payment QR) starts with "000201"
-    const isPayment = hit.data.trim().startsWith("000201");
+    // 2. is it a DuitNow QR? EMV payment QRs start with "0002" + the format version ("01", personal QRs often "02"),
+    //    and DuitNow ones carry PayNet's id "A000000615" (PayNet runs DuitNow)
+    const text = hit.data.trim();
+    const isPayment = /^0002\d\d/.test(text) && text.includes("A000000615");
 
     // 3. the QR's corners → a box on the ORIGINAL picture, plus a white border (QR needs a "quiet zone")
     const L = hit.location;
@@ -162,7 +164,7 @@ async function cropToQr(file: File): Promise<Cropped | string> {
     bitmap.close();
 
     const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("no blob"))), "image/png"));
-    return { blob, name: isPayment ? merchantName(hit.data.trim()) : null, isPayment, raw: hit.data };
+    return { blob, name: isPayment ? merchantName(text) : null, isPayment, raw: hit.data };
 }
 
 // EMV QR = blocks of [2-digit id][2-digit length][value]. Id 59 = the merchant's name.

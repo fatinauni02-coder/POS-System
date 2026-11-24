@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { cashRound, formatRM } from "@/lib/money";
 import { Spinner } from "@/components/submit-button";
+import { shopDuitnowQr } from "./actions";
 
 // Look copied from the approved prototype: pos_html/checkout.html + assets/pages/checkout.js
 // (big method tiles, "Cash tendered / Change due" boxes, quick amounts, till-style keypad).
@@ -47,6 +48,18 @@ export function CheckoutPanel({ total, onPay, onClose }: Props) {
     const [tendered, setTendered] = useState(0); // cash received, in sen (keypad works like a till: 5 0 0 0 = RM 50.00)
     const [saving, setSaving] = useState(false); // true while waiting for the server
     const [error, setError] = useState(""); // message from the server, if saving failed
+    const [qr, setQr] = useState<{ url: string; name: string | null } | null>(null); // shop's DuitNow QR (Settings → Payments)
+
+    // load the shop's DuitNow QR once, when the pop-up opens (so it's ready when DuitNow is picked)
+    useEffect(() => {
+        let alive = true;
+        shopDuitnowQr()
+            .then((q) => alive && setQr(q))
+            .catch(() => {}); // no QR → the plain DuitNow box
+        return () => {
+            alive = false;
+        };
+    }, []);
 
     const cash = method === "cash";
     // only cash is rounded to 5 sen (cards / QR pay the exact amount)
@@ -201,6 +214,19 @@ export function CheckoutPanel({ total, onPay, onClose }: Props) {
                                     </button>
                                 ))}
                             </div>
+                        </div>
+                    ) : method === "duitnow" && qr ? (
+                        // DUITNOW: the shop's own QR, big enough to scan from the till screen
+                        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl bg-tint p-6 text-center">
+                            <div className="rounded-2xl bg-white p-3 shadow-sm">
+                                {/* eslint-disable-next-line @next/next/no-img-element -- picture from Supabase Storage */}
+                                <img src={qr.url} alt="Shop DuitNow QR" className="h-56 w-56 object-contain" />
+                            </div>
+                            {qr.name && <p className="text-sm font-semibold text-ink-2">Pays to: {qr.name}</p>}
+                            <p className="text-3xl font-bold text-primary">{formatRM(payable)}</p>
+                            <p className="max-w-sm text-sm text-ink-2">
+                                Customer scans with any banking app and types <b>{formatRM(payable)}</b>. Confirm only when YOUR bank app or soundbox shows the money — not the customer&apos;s screen.
+                            </p>
                         </div>
                     ) : (
                         // CARD / QR / E-WALLET: what to do on the terminal

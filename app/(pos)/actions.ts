@@ -1,6 +1,7 @@
 "use server"; // everything in this file runs ONLY on the server (never in the browser)
 
 import { getBusiness } from "@/lib/business";
+import { getDuitnow } from "@/lib/duitnow";
 import { discountApprovedBy, makeDiscountApproval } from "@/lib/approval";
 import { DISCOUNTS } from "@/lib/money";
 import { approve } from "@/lib/pin";
@@ -278,4 +279,14 @@ export async function approveDiscount(pct: number, pin: string): Promise<Discoun
 
     // the slip remembers WHO approved (saved on the order when it's paid)
     return { ok: true, token: makeDiscountApproval(business.id, pct, check.by) };
+}
+
+// The shop's DuitNow QR for the counter checkout (Settings → Payments, migration 018).
+// null = no QR uploaded (the checkout then shows the plain "Customer scans DuitNow QR" box).
+export async function shopDuitnowQr(): Promise<{ url: string; name: string | null } | null> {
+    if (!(await getStaff())) return null; // signed-in staff only
+    const business = await getBusiness();
+    if (!business) return null;
+    const duitnow = await getDuitnow(business.id);
+    return duitnow?.qrUrl ? { url: duitnow.qrUrl, name: duitnow.name } : null;
 }
