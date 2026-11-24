@@ -6,7 +6,7 @@ import { useRef, useState } from "react";
 import { Spinner } from "@/components/submit-button";
 import { removeLogo, uploadLogo } from "./actions";
 
-// SHOP LOGO (sidebar, customer QR menu): cut to a square from the middle, 256 × 256 px.
+// SHOP LOGO (sidebar, customer QR menu): cut to a square from the middle, 512 × 512 px.
 // Buttons only (type="button"): the Settings page is one big form, and a form can't hold another form.
 export function LogoUpload({ url, initial }: { url: string | null; initial: string }) {
     const input = useRef<HTMLInputElement>(null);
@@ -72,15 +72,15 @@ export function LogoUpload({ url, initial }: { url: string | null; initial: stri
     );
 }
 
-// cut the middle square out and make it 256 × 256 (PNG keeps see-through logos see-through)
+// cut the middle square out and make it 512 × 512 (PNG keeps see-through logos see-through)
 async function squareLogo(file: File): Promise<Blob> {
     const bitmap = await createImageBitmap(file);
     const side = Math.min(bitmap.width, bitmap.height);
     const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 256;
+    canvas.width = canvas.height = 512; // 512: sharp enough for home-screen icons
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("no canvas");
-    ctx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, 256, 256);
+    ctx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, 512, 512);
     bitmap.close();
     return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("no blob"))), "image/png"));
 }

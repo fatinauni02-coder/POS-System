@@ -7,6 +7,8 @@ import { LiveRefresh } from "@/components/live-refresh";
 import { Loading } from "@/components/loading";
 import { formatRM, toSen } from "@/lib/money";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { billPayment } from "@/lib/duitnow";
+import { PayCard } from "./pay-card";
 
 // "/order/track/<id>" = the customer's own order status (the id is a long random code only they have).
 // Look copied from the approved prototype: the status tracker in pos_html/assets/pages/order-qr.js
@@ -22,6 +24,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Line = { name: string; qty: number; unit_sen: number; options: { name: string }[] };
 type Row = {
+    business_id: string;
+    order_id: number | null;
     ticket_no: number;
     order_type: "dine_in" | "takeaway";
     table_label: string | null;
@@ -44,7 +48,7 @@ async function Track({ params }: { params: PageProps<"/order/track/[id]">["param
     const { data } = await supabaseAdmin
         .from("qr_orders")
         .select(
-            "ticket_no, order_type, table_label, customer_name, status, reject_reason, lines, subtotal, created_at, businesses(name, takeaway_qr_code), dining_tables(qr_code), orders(status)",
+            "business_id, order_id, ticket_no, order_type, table_label, customer_name, status, reject_reason, lines, subtotal, created_at, businesses(name, takeaway_qr_code), dining_tables(qr_code), orders(status)",
         )
         .eq("id", id)
         .maybeSingle();
@@ -54,6 +58,8 @@ async function Track({ params }: { params: PageProps<"/order/track/[id]">["param
     const takeaway = q.order_type === "takeaway";
     const finished = q.status === "done" || q.status === "rejected";
     const paid = q.orders?.status === "completed";
+    // Pay by DuitNow (takeaway, after the shop accepts; migration 018) — null = pay at the counter only
+    const payment = !paid && q.status !== "rejected" ? await billPayment(q.business_id, q.order_id) : null;
     // the 3 steps; "at" = which one is happening now (3 = all done)
     const steps = [
         { id: "new", title: "Order sent", sub: "Waiting for the staff to confirm", Icon: Send },
@@ -81,9 +87,14 @@ async function Track({ params }: { params: PageProps<"/order/track/[id]">["param
                 {paid ? (
                     <p className="label-caps mx-auto mt-3 w-fit rounded-md bg-success/10 px-2 py-1 text-success">Paid</p>
                 ) : (
-                    <p className="mt-3 rounded-xl bg-tint-2 p-2 text-sm">Show this number when you pay at the counter</p>
+                    <p className="mt-3 rounded-xl bg-tint-2 p-2 text-sm">
+                        {payment ? "Pay by DuitNow below, or show this number at the counter" : "Show this number when you pay at the counter"}
+                    </p>
                 )}
             </div>
+
+            {/* PAY BY DUITNOW */}
+            {payment && <PayCard id={id} ticketNo={q.ticket_no} payment={payment} />}
 
             {q.status === "rejected" ? (
                 <div className="card mt-3 flex items-start gap-3 p-4 text-danger">

@@ -244,7 +244,7 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
                     name="duitnow_in_app"
                     on={duitnow?.inApp ?? false}
                     title="Let customers pay in the app / QR page"
-                    desc="Takeaway: after you accept the order. Dine-in: the whole table bill at the end. They tap “I've paid”, you check your bank and confirm."
+                    desc="Takeaway orders only, after you accept them (dine-in tables pay at the counter). They tap “I've paid”, you check your bank and confirm."
                   />
                 </div>
               </Section>

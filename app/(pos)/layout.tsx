@@ -1,7 +1,24 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { BottomNavForStaff, SideNavForStaff } from "@/components/role-navs";
 import { TopBar } from "@/components/top-bar";
 import { ThemeStyle } from "@/components/theme-style";
+import { getBusiness } from "@/lib/business";
+import { shortName } from "@/lib/app-name";
+
+// Staff pages: browser-tab title + iPhone/iPad "Add to Home Screen" name and icon from Settings
+// (Android / Chrome read app/manifest.ts instead). Without a logo: the built-in K icon.
+export async function generateMetadata(): Promise<Metadata> {
+  const business = await getBusiness();
+  const name = business?.name ?? "Cafe";
+  const logo = (business?.logo_url as string | null) ?? null;
+  return {
+    title: `${name} POS`,
+    appleWebApp: { capable: true, title: shortName(name), statusBarStyle: "default" },
+    icons: { apple: logo ?? "/icon-192.png" },
+  };
+}
+
 
 // STAFF LAYOUT — wraps every page in the (pos) folder (Order, Tables, Menu, Stock…).
 // A folder name in (brackets) is a "route group": it groups files but is NOT part of the address,

@@ -10,7 +10,8 @@ import { getBusiness } from "@/lib/business";
 import { formatRM, toSen } from "@/lib/money";
 import { getStaff } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { acceptQr, moveQr, setQrOrdering } from "./actions";
+import { billPayment } from "@/lib/duitnow";
+import { acceptQr, clearPayClaim, moveQr, setQrOrdering } from "./actions";
 import { RejectButton } from "./reject-button";
 import { SubmitButton } from "@/components/submit-button";
 
@@ -69,6 +70,12 @@ async function QrBoard({ searchParams }: { searchParams: PageProps<"/qr">["searc
             .order("created_at"),
     ]);
     const orders = (data ?? []) as unknown as QrRow[];
+    const claims = await loadClaims(business.id);
+    // a claim shows INSIDE its order card; the strip at the top is only for bills with no card on the board
+    // (e.g. a dine-in table that was already "Served" and pays at the end)
+    const onBoard = new Set(orders.map((o) => o.order_id));
+    const claimFor = new Map(claims.map((c) => [c.bill, c]));
+    const looseClaims = claims.filter((c) => !onBoard.has(c.bill));
     const qrOn = shop?.qr_ordering ?? false;
     const fresh = orders.filter((o) => o.status === "new").length;
 
@@ -121,6 +128,35 @@ async function QrBoard({ searchParams }: { searchParams: PageProps<"/qr">["searc
                 </div>
             )}
 
+            {/* "I'VE PAID" — customers who say they paid by DuitNow (any open bill, even after Served) */}
+            {looseClaims.length > 0 && (
+                <div role="status" className="border-b border-warning/30 bg-warning/10 px-6 py-3">
+                    <p className="flex items-center gap-2 font-bold text-warning">
+                        <HandCoins className="h-5 w-5" />
+                        {looseClaims.length === 1 ? "A customer says they've" : `${looseClaims.length} customers say they've`} paid by DuitNow — check YOUR bank app, then confirm
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        {looseClaims.map((c) => (
+                            <div key={c.bill} className="flex flex-wrap items-center gap-3 rounded-xl bg-surface px-3 py-2 shadow-sm">
+                                <span className="text-sm">
+                                    <b className="money">{c.tickets}</b> · {c.who} · <b className="money">{c.amountSen != null ? formatRM(c.amountSen) : "see bill"}</b> ·{" "}
+                                    <span className="text-ink-2">{minutesAgo(c.claimedAt)}</span>
+                                </span>
+                                {/* opens the bill → Pay → DuitNow QR (records the payment, prints the receipt) */}
+                                <Link href={c.payHref} className="btn-primary flex h-9 items-center gap-1.5 px-3 text-sm">
+                                    <Check className="h-4 w-4" />
+                                    Confirm
+                                </Link>
+                                <form action={clearPayClaim}>
+                                    <input type="hidden" name="bill" value={c.bill} />
+                                    <SubmitButton className="btn-soft flex h-9 items-center px-3 text-sm">Not received</SubmitButton>
+                                </form>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* 3 COLUMNS (one under the other on phones) */}
             <div className="grid min-h-0 flex-1 gap-4 p-6 lg:grid-cols-3">
                 {COLUMNS.map((col) => {
@@ -135,7 +171,7 @@ async function QrBoard({ searchParams }: { searchParams: PageProps<"/qr">["searc
                             <div className="no-scrollbar flex flex-1 flex-col gap-3 overflow-y-auto">
                                 {list.length === 0 && <p className="py-10 text-center text-sm text-ink-3">Nothing here</p>}
                                 {list.map((o) => (
-                                    <Card key={o.id} order={o} />
+                                    <Card key={o.id} order={o} claim={o.order_id != null ? claimFor.get(o.order_id) : undefined} />
                                 ))}
                             </div>
                         </section>
@@ -147,14 +183,16 @@ async function QrBoard({ searchParams }: { searchParams: PageProps<"/qr">["searc
 }
 
 // ONE ORDER CARD
-function Card({ order: o }: { order: QrRow }) {
+function Card({ order: o, claim }: { order: QrRow; claim?: Claim }) {
     const paid = o.orders?.status === "completed";
     const takeaway = o.order_type === "takeaway";
     const code = `Q${o.ticket_no}`;
     const items = o.lines.reduce((n, l) => n + l.qty, 0);
 
     // small chip top-right: where the money is
-    const payChip = !takeaway ? (
+    const payChip = claim ? (
+        <span className="label-caps rounded-md bg-warning/15 px-2 py-1 text-warning">Says paid</span>
+    ) : !takeaway ? (
         <span className="label-caps rounded-md bg-tint px-2 py-1 text-ink-2">{o.status === "new" ? "Pay at end" : `On table ${o.table_label} bill`}</span>
     ) : paid ? (
         <span className="label-caps rounded-md bg-success/10 px-2 py-1 text-success">Paid</span>
@@ -195,6 +233,30 @@ function Card({ order: o }: { order: QrRow }) {
                 </span>
                 {formatRM(toSen(o.subtotal))}
             </p>
+
+            {/* "I'VE PAID": the customer says they paid by DuitNow → staff check their bank first */}
+            {claim && (
+                <div className="mt-3 rounded-xl bg-warning/10 p-3 ring-1 ring-warning/30">
+                    <p className="flex items-center gap-1.5 text-sm font-bold text-warning">
+                        <HandCoins className="h-4 w-4" />
+                        Paid by DuitNow? · <span className="money">{claim.amountSen != null ? formatRM(claim.amountSen) : "see bill"}</span>
+                    </p>
+                    <p className="mt-0.5 text-xs text-ink-2">
+                        {minutesAgo(claim.claimedAt)} · check YOUR bank app or soundbox, not the customer&apos;s screen
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                        <form action={clearPayClaim} className="flex flex-1">
+                            <input type="hidden" name="bill" value={claim.bill} />
+                            <SubmitButton className={`btn-soft ${BTN}`}>Not received</SubmitButton>
+                        </form>
+                        {/* opens the bill → Pay → DuitNow QR (records it, prints the receipt) */}
+                        <Link href={claim.payHref} className={`btn-primary ${BTN}`}>
+                            <Check className="h-4 w-4" />
+                            Confirm
+                        </Link>
+                    </div>
+                </div>
+            )}
 
             {/* BUTTONS for each column */}
             <div className="mt-3 flex gap-2">
@@ -247,6 +309,37 @@ function Card({ order: o }: { order: QrRow }) {
                     ))}
             </div>
         </article>
+    );
+}
+
+// Open bills where the customer tapped "I've paid" (migration 018).
+// Read on their own: if 018 isn't run yet this just returns [] and the board works as before.
+type Claim = { bill: number; tickets: string; who: string; amountSen: number | null; claimedAt: string; payHref: string };
+
+async function loadClaims(businessId: string): Promise<Claim[]> {
+    const { data, error } = await supabaseAdmin
+        .from("orders")
+        .select("id, order_type, table_label, customer_name, pay_claimed_at, qr_orders(ticket_no)")
+        .eq("business_id", businessId)
+        .eq("status", "open")
+        .not("pay_claimed_at", "is", null)
+        .order("pay_claimed_at");
+    if (error || !data) return [];
+    return Promise.all(
+        data.map(async (b) => {
+            const tickets = ((b.qr_orders ?? []) as { ticket_no: number }[]).map((q) => `Q${q.ticket_no}`).join(", ") || "Bill";
+            const takeaway = b.order_type === "takeaway";
+            const pay = await billPayment(businessId, b.id); // same amount the customer saw
+            return {
+                bill: b.id,
+                tickets,
+                who: takeaway ? `Takeaway · ${b.customer_name ?? ""}` : `Table ${b.table_label}`,
+                amountSen: pay?.amountDueSen ?? null,
+                claimedAt: b.pay_claimed_at as string,
+                // takeaway: its own bill · dine-in: the table's bill (restaurant mode)
+                payHref: takeaway ? `/?bill=${b.id}` : `/?table=${encodeURIComponent(b.table_label ?? "")}`,
+            };
+        }),
     );
 }
 

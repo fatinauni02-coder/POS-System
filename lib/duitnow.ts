@@ -17,7 +17,8 @@ export async function getDuitnow(businessId: string): Promise<Duitnow | null> {
 }
 
 // What the customer's status screen needs to pay a bill by DuitNow — or null = nothing to pay in the app:
-// not accepted yet (no bill), already paid, the shop switched it off, or DuitNow isn't a payment method.
+// not accepted yet (no bill), already paid, a dine-in table (they pay at the counter), the shop switched it off,
+// or DuitNow isn't a payment method.
 export type BillPayment = { qrUrl: string; name: string | null; amountDueSen: number; claimed: boolean };
 
 export async function billPayment(businessId: string, orderId: number | null): Promise<BillPayment | null> {
@@ -25,14 +26,14 @@ export async function billPayment(businessId: string, orderId: number | null): P
     const [duitnow, { data: shop }, { data: bill, error }] = await Promise.all([
         getDuitnow(businessId),
         supabaseAdmin.from("businesses").select("sst_registered, sst_rate, payment_methods").eq("id", businessId).maybeSingle(),
-        supabaseAdmin.from("orders").select("status, subtotal, pay_claimed_at").eq("id", orderId).eq("business_id", businessId).maybeSingle(),
+        supabaseAdmin.from("orders").select("status, order_type, subtotal, pay_claimed_at").eq("id", orderId).eq("business_id", businessId).maybeSingle(),
     ]);
     if (!duitnow?.inApp || !duitnow.qrUrl || error || !bill || !shop) return null;
     if (bill.status !== "open") return null; // paid (completed) or refunded
+    if (bill.order_type !== "takeaway") return null; // dine-in tables pay at the counter (Auni, 24 Nov)
     if (!((shop.payment_methods ?? []) as string[]).includes("duitnow")) return null; // staff couldn't record it as DuitNow
 
     // same totals as pay_bill (no discount from the app, no cash rounding: DuitNow isn't cash)
-    // dine-in = the WHOLE table bill (every round), takeaway = this order's bill
     const subtotal = Math.round(Number(bill.subtotal) * 100);
     const rate = shop.sst_registered ? Number(shop.sst_rate) : 0;
     const sst = Math.round((subtotal * rate) / 100);

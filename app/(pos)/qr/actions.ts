@@ -108,3 +108,22 @@ export async function setQrOrdering(formData: FormData) {
     if (error) back("error", error.message);
     back("msg", on ? "QR ordering is ON" : "QR ordering is paused — customers are asked to order at the counter");
 }
+
+// "Not received": the customer tapped "I've paid" but the money isn't in the bank → clear the hint.
+// (Their app then shows "Pay by DuitNow" again, so they can try again or pay at the counter.)
+export async function clearPayClaim(formData: FormData) {
+    const business = await shopForStaff();
+    const bill = Number(formData.get("bill"));
+    if (!Number.isInteger(bill) || bill <= 0) back("error", "That bill is gone.");
+    const { error } = await supabaseAdmin
+        .from("orders")
+        .update({ pay_claimed_at: null })
+        .eq("business_id", business.id)
+        .eq("id", bill)
+        .eq("status", "open");
+    if (error) {
+        console.error("clear pay claim failed:", error);
+        back("error", "Couldn't update. Please try again.");
+    }
+    back("msg", "Marked as not received — the customer can pay again or pay at the counter");
+}
