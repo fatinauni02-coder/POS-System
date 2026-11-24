@@ -14,34 +14,42 @@ export function DuitnowUpload({ url }: { url: string | null }) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [found, setFound] = useState(""); // name read from inside the QR
+    const [unsure, setUnsure] = useState<Cropped | null>(null); // found a QR, but not the standard DuitNow format
 
     async function picked(file: File | undefined) {
         if (!file) return;
         setError("");
         setFound("");
+        setUnsure(null);
         if (!file.type.startsWith("image/")) return setError("That isn't a picture");
         setBusy(true);
         try {
             const qr = await cropToQr(file);
-            if (typeof qr === "string") {
-                setError(qr); // no QR / not a payment QR
-            } else {
-                const form = new FormData();
-                form.set("qr", qr.blob, "duitnow.png");
-                const message = await uploadDuitnowQr(form);
-                if (message) setError(message);
-                else if (qr.name) {
-                    setFound(qr.name);
-                    // fill "Name customers will see" if it's still empty (that box is part of the big settings form)
-                    const box = document.querySelector<HTMLInputElement>('input[name="duitnow_name"]');
-                    if (box && !box.value.trim()) box.value = qr.name;
-                }
-            }
+            if (typeof qr === "string") setError(qr); // no QR found
+            else if (!qr.isPayment) setUnsure(qr); // a QR, but not the usual DuitNow format → let the owner decide
+            else await save(qr);
         } catch {
             setError("Couldn't read that picture. Try another one.");
         }
         setBusy(false);
         if (input.current) input.current.value = "";
+    }
+
+    // upload the cropped QR (+ fill the name box from the QR if it's still empty)
+    async function save(qr: Cropped) {
+        setBusy(true);
+        setUnsure(null);
+        const form = new FormData();
+        form.set("qr", qr.blob, "duitnow.png");
+        const message = await uploadDuitnowQr(form);
+        setBusy(false);
+        if (message) return setError(message);
+        setFound(qr.name ?? "saved");
+        if (qr.name) {
+            // "Name customers will see" is part of the big settings form
+            const box = document.querySelector<HTMLInputElement>('input[name="duitnow_name"]');
+            if (box && !box.value.trim()) box.value = qr.name;
+        }
     }
 
     async function remove() {
@@ -83,7 +91,17 @@ export function DuitnowUpload({ url }: { url: string | null }) {
                 <p className="max-w-sm text-xs text-ink-3">
                     Any picture with your DuitNow QR works (screenshot, poster, photo): we keep only the QR. Test it once with your own banking app.
                 </p>
-                {found && <p className="text-xs font-semibold text-success">QR found ✓ · Name in the QR: {found}</p>}
+                {found && <p className="text-xs font-semibold text-success">QR saved ✓{found !== "saved" && ` · Name in the QR: ${found}`}</p>}
+                {unsure && (
+                    <div className="max-w-sm rounded-xl bg-warning/15 p-3 text-xs text-ink-2">
+                        <p className="font-semibold text-warning">Found a QR, but it isn&apos;t in the usual DuitNow format.</p>
+                        <p className="mt-1 break-all">It reads: <code>{unsure.raw.slice(0, 60)}{unsure.raw.length > 60 ? "…" : ""}</code></p>
+                        <p className="mt-1">Some banks&apos; personal QRs look like this. Only use it if paying it with another banking app works.</p>
+                        <button type="button" disabled={busy} onClick={() => save(unsure)} className="btn-soft mt-2 h-9 px-3 text-xs">
+                            Use it anyway
+                        </button>
+                    </div>
+                )}
                 {error && <p className="text-xs font-semibold text-danger">{error}</p>}
             </div>
         </div>
@@ -92,7 +110,7 @@ export function DuitnowUpload({ url }: { url: string | null }) {
 
 // ---------- find + crop ----------
 
-type Cropped = { blob: Blob; name: string | null };
+type Cropped = { blob: Blob; name: string | null; isPayment: boolean; raw: string };
 
 // returns the cropped QR, or an error message (string)
 async function cropToQr(file: File): Promise<Cropped | string> {
@@ -115,11 +133,8 @@ async function cropToQr(file: File): Promise<Cropped | string> {
         return "No QR code found in this picture. Try a clearer, straight-on picture of the QR.";
     }
 
-    // 2. is it a payment QR? DuitNow (and every EMV payment QR) starts with "000201"
-    if (!hit.data.startsWith("000201")) {
-        bitmap.close();
-        return "That QR isn't a payment QR. Use the DuitNow QR from your bank's merchant app.";
-    }
+    // 2. is it a standard payment QR? DuitNow (and every EMV payment QR) starts with "000201"
+    const isPayment = hit.data.trim().startsWith("000201");
 
     // 3. the QR's corners → a box on the ORIGINAL picture, plus a white border (QR needs a "quiet zone")
     const L = hit.location;
@@ -147,7 +162,7 @@ async function cropToQr(file: File): Promise<Cropped | string> {
     bitmap.close();
 
     const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("no blob"))), "image/png"));
-    return { blob, name: merchantName(hit.data) };
+    return { blob, name: isPayment ? merchantName(hit.data.trim()) : null, isPayment, raw: hit.data };
 }
 
 // EMV QR = blocks of [2-digit id][2-digit length][value]. Id 59 = the merchant's name.
