@@ -5,12 +5,13 @@ import { redirect } from "next/navigation";
 
 import { checkOwnPin, hasOwnPin, setOwnPin } from "@/lib/pin";
 import { getBusiness } from "@/lib/business";
+import { getDuitnow } from "@/lib/duitnow";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireManager } from "@/lib/staff";
 import { HEX, THEME_PRESETS } from "@/lib/theme";
 
 // which section was open ("?tab=…"), so we go back to the same one
-const TABS = ["business", "appearance", "tax", "receipt", "service", "security"];
+const TABS = ["business", "appearance", "tax", "receipt", "service", "payments", "security"];
 
 // go back to /settings (same section) with a red message
 function fail(tabQ: string, message: string): never {
@@ -37,6 +38,10 @@ export async function saveSettings(formData: FormData) {
     if (!Number.isFinite(sstRate) || sstRate < 0 || sstRate > 20) fail(tabQ, "SST rate must be between 0 and 20");
     if (serviceMode !== "cafe" && serviceMode !== "restaurant") fail(tabQ, "Pick a service style");
 
+    // PAYMENTS: "Pay by DuitNow" in the app needs the QR picture first
+    const duitnowInApp = formData.get("duitnow_in_app") === "on";
+    if (duitnowInApp && !(await getDuitnow(business.id))?.qrUrl) fail(tabQ, "Upload your DuitNow QR first, then turn on paying in the app");
+
     // APPEARANCE: 4 colours (#rrggbb) + which preset (or "custom")
     const colour = (key: string) => String(formData.get(`theme_${key}`) ?? "").toLowerCase();
     const theme = {
@@ -61,6 +66,8 @@ export async function saveSettings(formData: FormData) {
             sst_reg_no: text("sst_reg_no", 40),
             receipt_footer: text("receipt_footer", 200),
             service_mode: serviceMode,
+            duitnow_name: text("duitnow_name", 60),
+            duitnow_in_app: duitnowInApp,
             theme,
             // what prints by itself after Pay / Send to kitchen (ticked box = "on")
             // which actions need a manager PIN (ticked = PIN needed)
@@ -155,4 +162,45 @@ export async function removeLogo() {
     await supabaseAdmin.from("businesses").update({ logo_url: null }).eq("id", business.id);
     await deleteStored((business.logo_url as string | null) ?? null);
     revalidatePath("/", "layout");
+}
+
+// ---------- shop DuitNow QR (same bucket; migration 018) ----------
+
+// returns an error message, or null
+export async function uploadDuitnowQr(formData: FormData): Promise<string | null> {
+    await requireManager();
+    const business = await getBusiness();
+    if (!business) return "Shop not found";
+
+    const file = formData.get("qr");
+    if (!(file instanceof File) || file.size === 0) return "Pick a picture first";
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) return "Use a PNG, JPG or WebP picture";
+    if (file.size > 1024 * 1024) return "Picture is too big (max 1 MB)";
+
+    const before = await getDuitnow(business.id); // to delete the old picture after
+    const ext = file.type === "image/jpeg" ? "jpg" : file.type === "image/webp" ? "webp" : "png";
+    const path = `${business.id}/duitnow-${Date.now()}.${ext}`;
+    const { error: upError } = await supabaseAdmin.storage.from(BUCKET).upload(path, file, { contentType: file.type, cacheControl: "31536000" });
+    if (upError) {
+        console.error("DuitNow QR upload failed:", upError);
+        return "Couldn't upload the QR. Please try again.";
+    }
+    const url = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    const { error } = await supabaseAdmin.from("businesses").update({ duitnow_qr_url: url }).eq("id", business.id);
+    if (error) return error.message.includes("duitnow_qr_url") ? "Run migration 018 in Supabase first." : error.message;
+
+    await deleteStored(before?.qrUrl ?? null);
+    revalidatePath("/settings");
+    return null;
+}
+
+// no QR → customers can't pay in the app any more (switch goes off too)
+export async function removeDuitnowQr() {
+    await requireManager();
+    const business = await getBusiness();
+    if (!business) return;
+    const before = await getDuitnow(business.id);
+    await supabaseAdmin.from("businesses").update({ duitnow_qr_url: null, duitnow_in_app: false }).eq("id", business.id);
+    await deleteStored(before?.qrUrl ?? null);
+    revalidatePath("/settings");
 }

@@ -1,8 +1,9 @@
-import { Armchair, Palette, ChevronRight, Users, Check, CircleCheck, Coffee, LayoutGrid, Lock, LockKeyhole, Percent, Receipt, Save, Settings, Store } from "lucide-react";
+import { Armchair, Palette, ChevronRight, Users, Check, CircleCheck, Coffee, LayoutGrid, Lock, LockKeyhole, Percent, QrCode, Receipt, Save, Settings, Store } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
 import { getBusiness } from "@/lib/business";
+import { getDuitnow } from "@/lib/duitnow";
 import { Toast } from "@/components/toast";
 import { hasOwnPin, pinNeeded } from "@/lib/pin";
 import { getStaff } from "@/lib/staff";
@@ -11,6 +12,7 @@ import { Loading } from "@/components/loading";
 import { SubmitButton } from "@/components/submit-button";
 import { readTheme } from "@/lib/theme";
 import { LogoUpload } from "./logo-upload";
+import { DuitnowUpload } from "./duitnow-upload";
 import { ThemeEditor } from "./theme-editor";
 
 export default function SettingsPage({ searchParams }: PageProps<"/settings">) {
@@ -28,6 +30,7 @@ const TABS = [
   { id: "tax", label: "Tax (SST)", Icon: Percent },
   { id: "receipt", label: "Receipt & printing", Icon: Receipt },
   { id: "service", label: "Service style", Icon: Armchair },
+  { id: "payments", label: "Payments", Icon: QrCode },
   { id: "security", label: "Manager PIN", Icon: LockKeyhole },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
@@ -42,6 +45,7 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
   if (!business) return <p className="p-6 text-danger">Shop not found</p>;
   const auto = (business.auto_print ?? {}) as { receipt?: boolean; bar?: boolean; kitchen?: boolean };
   const me = await getStaff();
+  const duitnow = await getDuitnow(business.id); // null = migration 018 not run yet
   const hasPin = me ? await hasOwnPin(business.id, me.id) : false; // MY OWN PIN (each manager has one)
 
   // every section of the settings form is ON the page (so Save sends all of them).
@@ -218,6 +222,29 @@ async function SettingsForm({ searchParams }: { searchParams: PageProps<"/settin
                     title="Restaurant · table layout"
                     desc="Seat, order, eat, pay at the end"
                     points={["Tables screen shows free and occupied tables", "Send items to the kitchen in rounds (add-ons)", "Pay the whole bill when the table leaves"]}
+                  />
+                </div>
+              </Section>
+            </div>
+
+            <div className={show("payments")}>
+              <Section
+                title="Pay by DuitNow QR"
+                desc="Customers pay into your own bank with your shop's DuitNow QR — no gateway, no fees from us. Staff still confirm every payment (Take payment → DuitNow QR)."
+              >
+                {!duitnow && <p className="mb-4 rounded-xl bg-warning/15 p-3 text-sm font-semibold text-warning">Run migration 018 in Supabase to use this.</p>}
+                <DuitnowUpload url={duitnow?.qrUrl ?? null} />
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <Field label="Name customers will see" hint="As your bank shows it after scanning, e.g. KOPI & CO ENTERPRISE">
+                    <input name="duitnow_name" defaultValue={duitnow?.name ?? ""} maxLength={60} className={INPUT} />
+                  </Field>
+                </div>
+                <div className="mt-4">
+                  <SwitchRow
+                    name="duitnow_in_app"
+                    on={duitnow?.inApp ?? false}
+                    title="Let customers pay in the app / QR page"
+                    desc="Takeaway: after you accept the order. Dine-in: the whole table bill at the end. They tap “I've paid”, you check your bank and confirm."
                   />
                 </div>
               </Section>
