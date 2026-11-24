@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { signIn } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
+import { getBusiness } from "@/lib/business";
 
 export default function LoginPage({ searchParams }: PageProps<"/login">) {
     return (
@@ -14,11 +15,23 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
 
 async function LoginForm({ searchParams }: { searchParams: PageProps<"/login">["searchParams"] }) {
     const { error } = await searchParams;
+    // shop logo + name from Settings → Business (no logo yet → the first letter of the name)
+    const business = await getBusiness();
+    const name = business?.name ?? "Cafe";
+    const logo = (business?.logo_url as string | null) ?? null;
 
     return (
         <form action={signIn} className="flex w-full max-w-sm flex-col gap-4 rounded-3xl border border-line bg-surface p-8">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-2xl font-bold text-white">K</div>
-            <h1 className="text-center text-2xl font-bold">Sign in</h1>
+            {logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logo} alt={name} className="mx-auto h-16 w-16 rounded-2xl object-cover" />
+            ) : (
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-2xl font-bold text-white">{name.charAt(0).toUpperCase()}</div>
+            )}
+            <div className="text-center">
+                <h1 className="text-2xl font-bold">Sign in</h1>
+                <p className="mt-1 text-sm font-semibold opacity-60">{name} POS</p>
+            </div>
 
             {error && <p className="rounded-xl bg-red-50 p-3 text-center text-sm font-semibold text-red-700">Wrong username or password</p>}
 
