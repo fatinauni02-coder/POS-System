@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { billPayment } from "@/lib/duitnow";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -18,7 +19,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     // 2. the order + whether its bill is paid (orders.status)
     const { data: q } = await supabaseAdmin
         .from("qr_orders")
-        .select("ticket_no, order_type, table_label, status, reject_reason, lines, subtotal, created_at, orders(status)")
+        .select("business_id, order_id, ticket_no, order_type, table_label, status, reject_reason, lines, subtotal, created_at, orders(status)")
         .eq("id", id)
         .maybeSingle();
     if (!q) {
@@ -26,7 +27,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     }
     const bill = q.orders as unknown as { status: string } | null;
 
-    // 3. a clean answer for the app
+    // 3. can the customer pay this bill by DuitNow in the app? (null = no; migration 018)
+    const payment = await billPayment(q.business_id, q.order_id);
+
+    // 4. a clean answer for the app
     return Response.json({
         id,
         ticketNo: q.ticket_no,
@@ -37,6 +41,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         paid: bill?.status === "completed",
         subtotalSen: Math.round(Number(q.subtotal) * 100),
         createdAt: q.created_at,
+        // Pay by DuitNow: QR picture, name the bank shows, amount (sen), and whether they tapped "I've paid"
+        payment,
         lines: ((q.lines ?? []) as Line[]).map((l) => ({
             name: l.name,
             qty: l.qty,
