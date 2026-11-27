@@ -18,7 +18,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   return {
     name: `${name} POS`,
     short_name: shortName(name),     // shown under the home-screen icon (keep it short)
-    start_url: "/",                  // the page that opens when you tap the icon
+    start_url: "/merchant",                  // the page that opens when you tap the icon
     display: "standalone",           // no browser address bar: looks like a real app
     background_color: theme.background, // splash screen colour
     theme_color: theme.primary,         // status bar colour

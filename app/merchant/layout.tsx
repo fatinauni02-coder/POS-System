@@ -1,0 +1,66 @@
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { BottomNavForStaff, SideNavForStaff } from "@/components/role-navs";
+import { TopBar } from "@/components/top-bar";
+import { ThemeStyle } from "@/components/theme-style";
+import { getBusiness } from "@/lib/business";
+import { shortName } from "@/lib/app-name";
+
+// Staff pages: browser-tab title + iPhone/iPad "Add to Home Screen" name and icon from Settings
+// (Android / Chrome read app/manifest.ts instead). Without a logo: the built-in K icon.
+export async function generateMetadata(): Promise<Metadata> {
+  const business = await getBusiness();
+  const name = business?.name ?? "Cafe";
+  const logo = (business?.logo_url as string | null) ?? null;
+  return {
+    title: `${name} POS`,
+    appleWebApp: { capable: true, title: shortName(name), statusBarStyle: "default" },
+    icons: { apple: logo ?? "/icon-192.png" },
+  };
+}
+
+
+// STAFF LAYOUT — wraps every page in the merchant folder (Order, Tables, Menu, Stock…).
+// The folder name IS part of the address:
+// app/merchant/menu/page.tsx = "/merchant/menu".
+// Page shape:
+//   ┌──────┬──────────────────────────┐
+//   │ Side │ TopBar                   │
+//   │ Nav  ├──────────────────────────┤
+//   │      │ {children} = the page    │
+//   │      │ (scrolls on its own)     │
+//   └──────┴──────────────────────────┘
+export default function PosLayout({ children }: { children: React.ReactNode }) {
+  return (
+    // flex = SideNav and the right column side by side (a row)
+    // h-dvh = exactly the screen height (dvh also works on tablets with browser bars)
+    <div className="flex h-dvh">
+      {/* the shop's colours (Settings → Appearance) */}
+      <Suspense fallback={null}>
+        <ThemeStyle />
+      </Suspense>
+      {/* SideNav reads the address (usePathname), which only exists when a page is asked for */}
+      <Suspense fallback={<aside className="hidden md:block w-[68px] shrink-0 border-r border-line bg-surface print:hidden" />}>
+        <SideNavForStaff />
+      </Suspense>
+
+      {/* RIGHT COLUMN: flex-col = top bar on top, page below
+          flex-1 = take all the width left over after the SideNav
+          min-w-0 = allow it to shrink (stops wide content pushing the page sideways) */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* TopBar reads the shop name from Supabase, so it can be slow:
+            the fallback is an empty bar of the same height (h-16) while it loads */}
+        <Suspense fallback={<header className="h-16 print:hidden border-b border-line bg-surface" />}>
+          <TopBar />
+        </Suspense>
+
+        {/* PAGE AREA: flex-1 = fills the height under the top bar
+            overflow-y-auto = only this area scrolls; sidebar + top bar stay still */}
+        <div className="flex-1 overflow-y-auto">{children}</div>
+        <Suspense fallback={null}>
+          <BottomNavForStaff />
+        </Suspense>
+      </div>
+    </div>
+  );
+}

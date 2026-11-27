@@ -1,6 +1,8 @@
 import { cache } from "react";
-import { BottomNav } from "@/app/(pos)/bottom-nav";
+import { BottomNav } from "@/app/merchant/bottom-nav";
 import { getBusiness } from "@/lib/business";
+import { getFeatures } from "@/lib/features";
+import { hqContext } from "@/lib/hq";
 import { getStaff } from "@/lib/staff";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { SideNav } from "./side-nav";
@@ -8,9 +10,9 @@ import { SideNav } from "./side-nav";
 // who's signed in + the shop's mode + waiting QR orders → which links (and badge) to show
 // cache = worked out once per page, shared by the sidebar and the phone bottom bar
 const navInfo = cache(async () => {
-    const [staff, business] = await Promise.all([getStaff(), getBusiness()]);
+    const [staff, business, hq, features] = await Promise.all([getStaff(), getBusiness(), hqContext(), getFeatures()]);
     const isManager = staff !== null && staff.role !== "staff";
-    if (!staff || !business) return { isManager, isRestaurant: false, newQr: 0, lowStock: 0, logoUrl: null, initial: "K" };
+    if (!staff || !business) return { isManager, isRestaurant: false, newQr: 0, lowStock: 0, logoUrl: null, initial: "K", isHq: false, features };
 
     const [{ count }, { data: stock }] = await Promise.all([
         // phone orders waiting for staff
@@ -30,6 +32,8 @@ const navInfo = cache(async () => {
         lowStock,
         logoUrl: (business.logo_url as string | null) ?? null, // Settings → Appearance → Logo
         initial: business.name.charAt(0).toUpperCase() || "K",
+        isHq: hq.isHq, // HQ user → "Outlets" in the sidebar
+        features, // the merchant's plan: hides QR / Tables / Stock / Outlets when not in it
     };
 });
 

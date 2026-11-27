@@ -37,6 +37,6 @@ export const getStaff = cache(async () => {
 // owner/manager only: anyone else is sent back to the Order screen
 export async function requireManager() {
     const staff = await getStaff();
-    if (!staff || staff.role === "staff") redirect("/");
+    if (!staff || staff.role === "staff") redirect("/merchant");
     return staff;
 }
